@@ -83,9 +83,14 @@ namespace AuctionBot
             return;
 
         uint32 now = static_cast<uint32>(time(nullptr));
+        uint32 nextLevel = CalculateNextAuctionLevel(bot->GetLevel());
+        uint32 nextTime = now + sPlayerbotAIConfig.auctionVisitDelay;
+        LOG_DEBUG("playerbots.auction",
+                  "[VISIT][SCHEDULED] bot={} currentLevel={} nextLevel={} nextTime={}+{}sec reason=first_pending_item",
+                  bot->GetName(), bot->GetLevel(), nextLevel, now, sPlayerbotAIConfig.auctionVisitDelay);
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_VISIT_REQUESTED, 1);
-        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_LEVEL, CalculateNextAuctionLevel(bot->GetLevel()));
-        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_TIME, now + sPlayerbotAIConfig.auctionVisitDelay);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_LEVEL, nextLevel);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_TIME, nextTime);
     }
 
     void ClearVisitRequest(Player* bot)
@@ -93,6 +98,7 @@ namespace AuctionBot
         if (!bot)
             return;
 
+        LOG_DEBUG("playerbots.auction", "[VISIT][CLEARED] bot={} reason=no_pending_items", bot->GetName());
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_VISIT_REQUESTED, 0);
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_LEVEL, 0);
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_TIME, 0);
@@ -106,10 +112,15 @@ namespace AuctionBot
         if (!retrySeconds)
             retrySeconds = sPlayerbotAIConfig.auctionVisitRetryDelay;
 
-        uint32 now = static_cast<uint32>(time(nullptr));
+        uint32 nextLevel = CalculateNextAuctionLevel(bot->GetLevel());
+        uint32 nextTime = now + retrySeconds;
+        LOG_DEBUG("playerbots.auction",
+                  "[VISIT][RETRY_SCHEDULED] bot={} nextLevel={} nextTime={}+{}sec reason=failed_or_incomplete",
+                  bot->GetName(), nextLevel, now, retrySeconds);
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_VISIT_REQUESTED, 1);
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_LAST_VISIT_TIME, now);
-        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_LEVEL, CalculateNextAuctionLevel(bot->GetLevel()));
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_LEVEL, nextLevel);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_TIME, nextTimeionLevel(bot->GetLevel()));
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_TIME, now + retrySeconds);
     }
 
@@ -118,13 +129,20 @@ namespace AuctionBot
         if (!bot)
             return;
 
-        uint32 now = static_cast<uint32>(time(nullptr));
-        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_LAST_VISIT_TIME, now);
-
-        if (!hasPendingItems)
-        {
+        uintLOG_DEBUG("playerbots.auction", "[VISIT][COMPLETE] bot={} reason=no_remaining_pending_items",
+                      bot->GetName());
             ClearVisitRequest(bot);
             return;
+        }
+
+        uint32 nextLevel = CalculateNextAuctionLevel(bot->GetLevel());
+        uint32 nextTime = now + sPlayerbotAIConfig.auctionVisitDelay;
+        LOG_DEBUG("playerbots.auction",
+                  "[VISIT][COMPLETE_WITH_PENDING] bot={} nextLevel={} nextTime={}+{}sec remaining_pending_items=true",
+                  bot->GetName(), nextLevel, now, sPlayerbotAIConfig.auctionVisitDelay);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_VISIT_REQUESTED, 1);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_LEVEL, nextLevel);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_NEXT_VISIT_TIME, nextTime
         }
 
         sRandomPlayerbotMgr.SetPersistentValue(bot, KEY_VISIT_REQUESTED, 1);

@@ -153,17 +153,31 @@ namespace
         ObjectGuid itemGuid = item->GetGUID();
         uint32 count = item->GetCount();
         AuctionListingPrice listingPrice = GetPlayerbotFallbackListingPrice(item);
+        char const* pricingSource = "fallback";
 
 #if PLAYERBOTS_HAS_AHBOT_PRICING
         if (std::optional<AuctionListingPrice> ahBotPrice = GetAhBotListingPrice(auctioneer, item))
+        {
             listingPrice = *ahBotPrice;
+            pricingSource = "ahbot";
+        }
 #endif
 
         uint32 bid = listingPrice.bid;
         uint32 buyout = listingPrice.buyout;
 
         if (!bid || !buyout || bid > buyout || buyout > MAX_MONEY_AMOUNT)
+        {
+            LOG_DEBUG("playerbots.auction",
+                      "[SELL][PLACE_SKIPPED] bot={} item={} guid={} count={} invalid price bid={} buyout={} source={}",
+                      bot->GetName(), item->GetEntry(), itemGuid.ToString(), count, bid, buyout, pricingSource);
             return false;
+        }
+
+        LOG_DEBUG("playerbots.auction",
+                  "[SELL][PLACE_ATTEMPT] bot={} item={} guid={} count={} bid={} buyout={} source={} auctioneer={}",
+                  bot->GetName(), item->GetEntry(), itemGuid.ToString(), count, bid, buyout, pricingSource,
+                  auctioneer->GetEntry());
 
         WorldPacket packet(CMSG_AUCTION_SELL_ITEM);
         packet << auctioneer->GetGUID();
@@ -175,8 +189,13 @@ namespace
         packet << AUCTION_DURATION_MINUTES;
 
         bot->GetSession()->HandleAuctionSellItem(packet);
+        bool placed = bot->GetItemByGuid(itemGuid) == nullptr && sAuctionMgr->GetAItem(itemGuid) != nullptr;
 
-        return bot->GetItemByGuid(itemGuid) == nullptr && sAuctionMgr->GetAItem(itemGuid) != nullptr;
+        LOG_DEBUG("playerbots.auction",
+                  "[SELL][PLACE_RESULT] bot={} item={} guid={} placed={} bid={} buyout={} source={}",
+                  bot->GetName(), item->GetEntry(), itemGuid.ToString(), placed ? 1 : 0, bid, buyout, pricingSource);
+
+        return placed;
     }
 
     uint32 GetBuyerSpendCapPercent(uint8 quality)
@@ -277,6 +296,9 @@ bool ChooseAuctionHouseTargetAction::Execute(Event /*event*/)
     if (!TravelMgr::instance().SelectAuctioneerByMap(bot, auctioneer))
         return false;
 
+    LOG_DEBUG("playerbots.auction", "[VISIT][SCHEDULED] bot={} next target auctioneerEntry={} map={}",
+              bot->GetName(), auctioneer.entry, auctioneer.loc.GetMapId());
+
     WorldPosition auctioneerPosition;
     auctioneerPosition.set(auctioneer.loc);
     TravelDestination* destination = nullptr;
@@ -353,6 +375,9 @@ bool AuctionPendingItemsAction::Execute(Event /*event*/)
     if (!auctioneer)
         return false;
 
+    LOG_DEBUG("playerbots.auction", "[SELL][VISIT_EXECUTED] bot={} auctioneer={} pendingItems={}",
+              bot->GetName(), auctioneer->GetEntry(), AuctionBot::GetPendingAuctionItems(botAI).size());
+
     std::vector<Item*> items = AuctionBot::GetPendingAuctionItems(botAI);
     uint32 posted = 0;
 
@@ -363,6 +388,9 @@ bool AuctionPendingItemsAction::Execute(Event /*event*/)
 
         if (!CanStillAuction(bot, botAI, item))
         {
+            LOG_DEBUG("playerbots.auction", "[SELL][PLACE_SKIPPED] bot={} item={} guid={} reason=failed_revalidation",
+                      bot->GetName(), item ? item->GetEntry() : 0,
+                      item ? item->GetGUID().ToString() : ObjectGuid::Empty.ToString());
             AuctionBot::RemoveAuctionIntent(botAI, item->GetGUID());
             continue;
         }
@@ -425,6 +453,9 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     if (!auctioneer)
         return false;
 
+    LOG_DEBUG("playerbots.auction", "[BUY][VISIT_EXECUTED] bot={} auctioneer={}",
+              bot->GetName(), auctioneer->GetEntry());
+
     AuctionHouseEntry const* ahEntry = AuctionHouseMgr::GetAuctionHouseEntryFromFactionTemplate(auctioneer->GetFaction());
     if (!ahEntry)
         return false;
@@ -480,6 +511,13 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
 
         ItemUsage usage = upgradeEvaluator.CalculateWithThreshold(proto->ItemId, auctionItem->GetItemRandomPropertyId(),
                                                                   sPlayerbotAIConfig.buyUpgradeThreshold);
+
+        LOG_DEBUG("playerbots.auction",
+                  "[BUY][CONSIDER] bot={} auctionId={} item={} guid={} usage={} quality={} bid={} buyout={}",
+                  bot->GetName(), auction->Id, proto->ItemId, auctionItem->GetGUID().ToString(),
+                  static_cast<uint32>(usage), static_cast<uint32>(proto->Quality),
+                  static_cast<uint32>(auction->bid ? auction->bid : auction->startbid), auction->buyout);
+
         if (!IsUpgradeUsage(usage))
             continue;
 
@@ -564,6 +602,9 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
         if (!offerPrice)
             continue;
 
+        LOG_DEBUG("playerbots.auction", "[BUY][BID_ATTEMPT] bot={} auctionId={} offer={} mode={}",
+                  bot->GetName(), candidate.auctionId, offerPrice, candidate.buyout ? "buyout" : "bid");
+
         uint64 moneyBefore = bot->GetMoney();
         if (!PlaceAuctionBid(bot, auctioneer, candidate.auctionId, offerPrice))
             continue;
@@ -585,6 +626,10 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
 
         if (bot->GetMoney() >= moneyBefore)
             continue;
+
+        LOG_DEBUG("playerbots.auction", "[BUY][{}] bot={} auctionId={} spent={}",
+                  candidate.buyout ? "BOUGHT_OUT" : "BID_ACCEPTED", bot->GetName(), candidate.auctionId,
+                  offerPrice);
 
         ++boughtCount;
     }

@@ -120,6 +120,9 @@ namespace AuctionBot
 
             if (existing == value.end())
             {
+                LOG_DEBUG("playerbots.auction",
+                          "[SELL][INTENT_MARKED] bot={} item={} guid={} count={} state=pending reason=eligible_item",
+                          bot->GetName(), item->GetEntry(), item->GetGUID().ToString(), item->GetCount());
                 value.push_back({item->GetGUID(), item->GetEntry(), item->GetCount(), AuctionIntentState::Pending,
                                  static_cast<time_t>(now), static_cast<time_t>(now)});
                 continue;
@@ -133,6 +136,14 @@ namespace AuctionBot
         }
 
         value.erase(std::remove_if(value.begin(), value.end(), [&eligibleGuids](AuctionIntent const& intent) {
+                        if (eligibleGuids.find(intent.itemGuid) == eligibleGuids.end())
+                        {
+                            LOG_DEBUG("playerbots.auction",
+                                      "[SELL][INTENT_REMOVED] item={} guid={} reason=no_longer_eligible_or_missing",
+                                      intent.itemEntry, intent.itemGuid.ToString());
+                            return true;
+                        }
+
                         return eligibleGuids.find(intent.itemGuid) == eligibleGuids.end();
                     }),
                     value.end());
