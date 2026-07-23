@@ -12,6 +12,8 @@
 #include "AlwaysLootListValue.h"
 #include "AoeHealValues.h"
 #include "AoeValues.h"
+#include "AuctionIntents.h"
+#include "AuctionValues.h"
 #include "AttackerCountValues.h"
 #include "AttackerWithoutAuraTargetValue.h"
 #include "AttackersValue.h"
@@ -283,6 +285,8 @@ public:
         creators["can repair"] = &ValueContext::can_repair;
         creators["should sell"] = &ValueContext::should_sell;
         creators["can sell"] = &ValueContext::can_sell;
+        creators["auction intents"] = &ValueContext::auction_intents;
+        creators["should visit auction house"] = &ValueContext::should_visit_auction_house;
         creators["can train"] = &ValueContext::can_train;
         creators["can fight equal"] = &ValueContext::can_fight_equal;
         creators["can fight elite"] = &ValueContext::can_fight_elite;
@@ -539,6 +543,11 @@ private:
     static UntypedValue* can_repair(PlayerbotAI* botAI) { return new CanRepairValue(botAI); }
     static UntypedValue* should_sell(PlayerbotAI* botAI) { return new ShouldSellValue(botAI); }
     static UntypedValue* can_sell(PlayerbotAI* botAI) { return new CanSellValue(botAI); }
+    static UntypedValue* auction_intents(PlayerbotAI* botAI) { return new AuctionBot::AuctionIntentsValue(botAI); }
+    static UntypedValue* should_visit_auction_house(PlayerbotAI* botAI)
+    {
+        return new ShouldVisitAuctionHouseValue(botAI);
+    }
     static UntypedValue* can_train(PlayerbotAI* botAI) { return new CanTrainValue(botAI); }
     static UntypedValue* can_fight_equal(PlayerbotAI* botAI) { return new CanFightEqualValue(botAI); }
     static UntypedValue* can_fight_elite(PlayerbotAI* botAI) { return new CanFightEliteValue(botAI); }

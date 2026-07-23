@@ -7,6 +7,7 @@
 #include "TravelMgr.h"
 
 #include <iomanip>
+#include <limits>
 #include <numeric>
 
 #include "AreaDefines.h"
@@ -4488,6 +4489,61 @@ const std::vector<WorldLocation> TravelMgr::GetTeleportLocations(Player* bot)
     return locsPerLevelCache[level];
 }
 
+bool TravelMgr::SelectAuctioneerByMap(Player* bot, NpcLocation& outAuctioneer)
+{
+    if (!bot)
+        return false;
+
+    WorldPosition botPos(bot);
+    float bestScore = std::numeric_limits<float>::max();
+    WorldPosition* bestPoint = nullptr;
+    uint32 bestEntry = 0;
+
+    std::vector<TravelDestination*> destinations = getRpgTravelDestinations(bot, true, true);
+    for (TravelDestination* destination : destinations)
+    {
+        RpgTravelDestination* rpgDestination = dynamic_cast<RpgTravelDestination*>(destination);
+        if (!rpgDestination)
+            continue;
+
+        CreatureTemplate const* cInfo = rpgDestination->GetCreatureTemplate();
+        if (!cInfo)
+            continue;
+
+        if (!(cInfo->npcflag & UNIT_NPC_FLAG_AUCTIONEER))
+            continue;
+
+        FactionTemplateEntry const* factionEntry = sFactionTemplateStore.LookupEntry(cInfo->faction);
+        ReputationRank reaction = Unit::GetFactionReactionTo(bot->GetFactionTemplateEntry(), factionEntry);
+        if (reaction < REP_NEUTRAL)
+            continue;
+
+        WorldPosition* point = destination->nearestPoint(&botPos);
+        if (!point)
+            continue;
+
+        float score = botPos.distance(point);
+
+        if (point->GetMapId() != bot->GetMapId())
+            score += 100000.0f;
+
+        if (score >= bestScore)
+            continue;
+
+        bestScore = score;
+        bestPoint = point;
+        bestEntry = cInfo->Entry;
+    }
+
+    if (!bestPoint || !bestEntry)
+        return false;
+
+    outAuctioneer.loc = WorldLocation(bestPoint->GetMapId(), bestPoint->GetPositionX(), bestPoint->GetPositionY(),
+                                      bestPoint->GetPositionZ(), bestPoint->GetOrientation());
+    outAuctioneer.entry = bestEntry;
+    return true;
+}
+
 const std::vector<WorldLocation> TravelMgr::GetTravelHubs(Player* bot)
 {
     std::vector<WorldLocation> locs = bot->GetTeamId() == TEAM_ALLIANCE
@@ -4554,6 +4610,25 @@ std::vector<WorldLocation> TravelMgr::GetCityLocations(Player* bot)
         return { locIt->second };
     // Fallback if something went wrong
     return fallbackLocations;
+}
+
+bool TravelMgr::IsInCity(Player* bot) const
+{
+    if (!bot)
+        return false;
+
+    uint32 zoneId = bot->GetZoneId();
+    uint32 areaId = bot->GetAreaId();
+
+    for (Capital const& capital : capitals)
+    {
+        if (capital.zoneId != zoneId && capital.zoneId != areaId)
+            continue;
+
+        return capital.team == TEAM_NEUTRAL || capital.team == bot->GetTeamId();
+    }
+
+    return false;
 }
 
 void TravelMgr::PrepareZone2LevelBracket()

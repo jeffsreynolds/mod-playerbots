@@ -101,6 +101,9 @@ public:
     bool randomBotGuildNearby, randomBotInvitePlayer, inviteChat;
     uint32 globalCoolDown, reactDelay, maxWaitForMove, disableMoveSplinePath, maxMovementSearchTime, expireActionTime,
         dispelAuraDuration, passiveDelay, repeatDelay, errorDelay, rpgDelay, sitDelay, returnDelay, lootDelay;
+    bool randomBotAuctionHouse;
+    uint32 auctionVisitDelay, auctionVisitMinInterval, auctionVisitRetryDelay, auctionVisitLevelInterval,
+        auctionItemsPerVisit, auctionPriceMinPercent, auctionPriceMaxPercent;
     bool dynamicReactDelay;
     float sightDistance, spellDistance, reactDistance, grindDistance, lootDistance, shootDistance, fleeDistance,
         tooCloseDistance, meleeDistance, followDistance, whisperDistance, contactDistance, aoeRadius, rpgDistance,
@@ -367,6 +370,17 @@ public:
     std::string autoPickReward;
     bool autoEquipUpgradeLoot;
     float equipUpgradeThreshold;
+    bool auctionBuyerEnabled;
+    float buyUpgradeThreshold;
+    uint32 auctionBuyPriceMinPercent;
+    uint32 auctionBuyPriceMaxPercent;
+    uint32 auctionBuyItemsPerVisit;
+    uint32 auctionBuyMaxSpendWhite;
+    uint32 auctionBuyMaxSpendGreen;
+    uint32 auctionBuyMaxSpendBlue;
+    uint32 auctionBuyMaxSpendPurple;
+    uint32 auctionBuyMaxSpendOrange;
+    uint32 auctionBuyMaxSpendYellow;
     bool twoRoundsGearInit;
     bool syncQuestWithPlayer;
     bool syncQuestForPlayer;

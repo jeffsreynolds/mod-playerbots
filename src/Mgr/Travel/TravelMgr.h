@@ -674,7 +674,7 @@ public:
     bool isActive(Player* bot) override;
     virtual CreatureTemplate const* GetCreatureTemplate();
     std::string const getName() override { return "RpgTravelDestination"; }
-    int32 getEntry() override { return 0; }
+    int32 getEntry() override { return entry; }
     std::string const getTitle() override;
 
 protected:
@@ -880,6 +880,7 @@ public:
     const std::vector<WorldLocation> GetTeleportLocations(Player* bot);
     const std::vector<WorldLocation> GetTravelHubs(Player* bot);
     std::vector<WorldLocation> GetCityLocations(Player* bot);
+    bool IsInCity(Player* bot) const;
     std::vector<uint32> GetFlightNodesInZone(uint32 zoneId, TeamId team, uint32 excludeNode = 0) const;
     bool SelectAuctioneerByMap(Player* bot, NpcLocation& outAuctioneer);
     const std::vector<WorldLocation>& GetLocsPerLevelCache(uint8 level) { return locsPerLevelCache[level]; }

@@ -141,6 +141,8 @@ public:
     std::string GetData(uint32 bot, std::string const& type);
     void SetValue(uint32 bot, std::string const& type, uint32 value, std::string const& data = "");
     void SetValue(Player* bot, std::string const& type, uint32 value, std::string const& data = "");
+    void SetPersistentValue(uint32 bot, std::string const& type, uint32 value, std::string const& data = "");
+    void SetPersistentValue(Player* bot, std::string const& type, uint32 value, std::string const& data = "");
     bool IsSpecPvp(uint32 bot, uint8 cls);
     void Remove(Player* bot);
     ObjectGuid GetBattleMasterGUID(Player* bot, BattlegroundTypeId bgTypeId);

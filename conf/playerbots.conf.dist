@@ -287,6 +287,32 @@ AiPlayerbot.AutoEquipUpgradeLoot = 1
 # Default: 1.1 (Equip when the equipment score of the new item is 1.1 times higher than the currently equipped item)
 AiPlayerbot.EquipUpgradeThreshold = 1.1
 
+# Enable randombot auction-house upgrade buying while visiting auctioneers.
+# Default: 0
+AiPlayerbot.AuctionBuyerEnabled = 0
+
+# Threshold for buying upgrades from auctions using the same equip-scoring logic.
+# Default: 1.2 (only buy if score is at least 20% higher)
+AiPlayerbot.BuyUpgradeThreshold = 1.2
+
+# Acceptable auction price window around AHBot reference value.
+# Default: 80-120
+AiPlayerbot.AuctionBuyPriceMinPercent = 80
+AiPlayerbot.AuctionBuyPriceMaxPercent = 120
+
+# Maximum number of upgrade purchases attempted per auction-house visit.
+# Default: 3
+AiPlayerbot.AuctionBuyItemsPerVisit = 3
+
+# Maximum spend per purchase as a percentage of bot's current money, by rarity.
+# Defaults: white=0, green=25, blue=50, purple=75, orange=0, yellow=0
+AiPlayerbot.AuctionBuyMaxSpendWhite = 0
+AiPlayerbot.AuctionBuyMaxSpendGreen = 25
+AiPlayerbot.AuctionBuyMaxSpendBlue = 50
+AiPlayerbot.AuctionBuyMaxSpendPurple = 75
+AiPlayerbot.AuctionBuyMaxSpendOrange = 0
+AiPlayerbot.AuctionBuyMaxSpendYellow = 0
+
 # Two rounds of equipment initialization to create more suitable gear
 AiPlayerbot.TwoRoundsGearInit = 0
 
@@ -384,6 +410,21 @@ AiPlayerbot.SitDelay = 20000
 # ReturnDelay has a minimum value of 2000 - lower values will cause a crash!
 AiPlayerbot.ReturnDelay = 2000
 AiPlayerbot.LootDelay = 1000
+
+# Enable scheduled auction-house activity for random bots.
+# Default: 1
+AiPlayerbot.RandomBotAuctionHouse = 1
+
+# Auction-house visit policy. Times are in seconds.
+# Defaults: planned delay 1800, all-visit cooldown 900, retry delay 1800, level interval 2,
+#           five listings per visit, and a 90-120% fallback price variation.
+AiPlayerbot.AuctionVisitDelay = 1800
+AiPlayerbot.AuctionVisitMinInterval = 900
+AiPlayerbot.AuctionVisitRetryDelay = 1800
+AiPlayerbot.AuctionVisitLevelInterval = 2
+AiPlayerbot.AuctionItemsPerVisit = 5
+AiPlayerbot.AuctionPriceMinPercent = 90
+AiPlayerbot.AuctionPriceMaxPercent = 120
 
 #
 #

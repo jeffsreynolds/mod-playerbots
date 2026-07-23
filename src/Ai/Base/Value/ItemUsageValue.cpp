@@ -159,7 +159,8 @@ ItemUsage ItemUsageValue::Calculate()
     return ITEM_USAGE_NONE;
 }
 
-ItemUsage ItemUsageValue::QueryItemUsageForEquip(ItemTemplate const* itemProto, int32 randomPropertyId)
+ItemUsage ItemUsageValue::QueryItemUsageForEquip(ItemTemplate const* itemProto, int32 randomPropertyId,
+                                                 float upgradeThreshold)
 {
     if (bot->BotCanUseItem(itemProto) != EQUIP_ERR_OK)
         return ITEM_USAGE_NONE;
@@ -217,6 +218,8 @@ ItemUsage ItemUsageValue::QueryItemUsageForEquip(ItemTemplate const* itemProto, 
         return ITEM_USAGE_NONE;
 
     bool shouldEquip = false;
+    if (upgradeThreshold <= 0.0f)
+        upgradeThreshold = sPlayerbotAIConfig.equipUpgradeThreshold;
     // uint32 statWeight = sRandomItemMgr.GetLiveStatWeight(bot, itemProto->ItemId);
     StatsWeightCalculator calculator(bot);
     calculator.SetItemSetBonus(false);
@@ -304,7 +307,7 @@ ItemUsage ItemUsageValue::QueryItemUsageForEquip(ItemTemplate const* itemProto, 
         {
             // uint32 oldStatWeight = sRandomItemMgr.GetLiveStatWeight(bot, oldItemProto->ItemId);
             if (itemScore || oldScore)
-                shouldEquipInSlot = itemScore > oldScore * sPlayerbotAIConfig.equipUpgradeThreshold;
+                shouldEquipInSlot = itemScore > oldScore * upgradeThreshold;
         }
 
         // Bigger quiver
@@ -899,6 +902,25 @@ ItemUsage ItemUpgradeValue::Calculate()
         return ITEM_USAGE_NONE;
 
     ItemUsage equip = QueryItemUsageForEquip(proto, randomPropertyId);
+    if (equip != ITEM_USAGE_NONE)
+        return equip;
+
+    if (proto->Class == ITEM_CLASS_PROJECTILE && bot->CanUseItem(proto) == EQUIP_ERR_OK)
+        return QueryItemUsageForAmmo(proto);
+
+    return ITEM_USAGE_NONE;
+}
+
+ItemUsage ItemUpgradeValue::CalculateWithThreshold(uint32 itemId, int32 randomPropertyId, float upgradeThreshold)
+{
+    if (!itemId)
+        return ITEM_USAGE_NONE;
+
+    ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId);
+    if (!proto)
+        return ITEM_USAGE_NONE;
+
+    ItemUsage equip = QueryItemUsageForEquip(proto, randomPropertyId, upgradeThreshold);
     if (equip != ITEM_USAGE_NONE)
         return equip;
 

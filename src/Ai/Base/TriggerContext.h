@@ -11,6 +11,7 @@
 #include "FishingTriggers.h"
 #include "GenericTriggers.h"
 #include "GuildTriggers.h"
+#include "AuctionTriggers.h"
 #include "LfgTriggers.h"
 #include "LootTriggers.h"
 #include "NamedObjectContext.h"
@@ -172,6 +173,8 @@ public:
         creators["has rpg target"] = &TriggerContext::has_rpg_target;
         creators["far from rpg target"] = &TriggerContext::far_from_rpg_target;
         creators["near rpg target"] = &TriggerContext::near_rpg_target;
+        creators["auction visit due"] = &TriggerContext::auction_visit_due;
+        creators["near auctioneer with auction items"] = &TriggerContext::near_auctioneer_with_auction_items;
         creators["no travel target"] = &TriggerContext::no_travel_target;
         creators["far from travel target"] = &TriggerContext::far_from_travel_target;
         creators["no rti target"] = &TriggerContext::no_rti;
@@ -256,6 +259,11 @@ private:
     static Trigger* sit(PlayerbotAI* botAI) { return new SitTrigger(botAI); }
     static Trigger* far_from_rpg_target(PlayerbotAI* botAI) { return new FarFromRpgTargetTrigger(botAI); }
     static Trigger* near_rpg_target(PlayerbotAI* botAI) { return new NearRpgTargetTrigger(botAI); }
+    static Trigger* auction_visit_due(PlayerbotAI* botAI) { return new AuctionVisitDueTrigger(botAI); }
+    static Trigger* near_auctioneer_with_auction_items(PlayerbotAI* botAI)
+    {
+        return new NearAuctioneerWithAuctionItemsTrigger(botAI);
+    }
     static Trigger* far_from_travel_target(PlayerbotAI* botAI) { return new FarFromTravelTargetTrigger(botAI); }
     static Trigger* no_travel_target(PlayerbotAI* botAI) { return new NoTravelTargetTrigger(botAI); }
     static Trigger* no_rpg_target(PlayerbotAI* botAI) { return new NoRpgTargetTrigger(botAI); }

@@ -9,6 +9,7 @@
 
 #include "AggressiveStrategy.h"
 #include "AttackEnemyPlayersStrategy.h"
+#include "AuctionStrategy.h"
 #include "BattlegroundStrategy.h"
 #include "CastTimeStrategy.h"
 #include "ChatCommandHandlerStrategy.h"
@@ -88,6 +89,7 @@ public:
         creators["reveal"] = &StrategyContext::reveal;
         creators["collision"] = &StrategyContext::collision;
         creators["rpg"] = &StrategyContext::rpg;
+        creators["auction"] = &StrategyContext::auction;
         creators["new rpg"] = &StrategyContext::new_rpg;
         creators["travel"] = &StrategyContext::travel;
         creators["explore"] = &StrategyContext::explore;
@@ -166,6 +168,7 @@ private:
     static Strategy* reveal(PlayerbotAI* botAI) { return new RevealStrategy(botAI); }
     static Strategy* collision(PlayerbotAI* botAI) { return new CollisionStrategy(botAI); }
     static Strategy* rpg(PlayerbotAI* botAI) { return new RpgStrategy(botAI); }
+    static Strategy* auction(PlayerbotAI* botAI) { return new AuctionStrategy(botAI); }
     static Strategy* new_rpg(PlayerbotAI* botAI) { return new NewRpgStrategy(botAI); }
     static Strategy* travel(PlayerbotAI* botAI) { return new TravelStrategy(botAI); }
     static Strategy* explore(PlayerbotAI* botAI) { return new ExploreStrategy(botAI); }

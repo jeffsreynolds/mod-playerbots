@@ -9,6 +9,7 @@
 
 #include "AddLootAction.h"
 #include "AttackAction.h"
+#include "AuctionHouseActions.h"
 #include "ShareQuestAction.h"
 #include "BattleGroundTactics.h"
 #include "AutoMaintenanceOnLevelupAction.h"
@@ -85,6 +86,7 @@ public:
         creators["move to rpg target"] = &ActionContext::move_to_rpg_target;
         creators["travel"] = &ActionContext::travel;
         creators["choose travel target"] = &ActionContext::choose_travel_target;
+        creators["choose auction house target"] = &ActionContext::choose_auction_house_target;
         creators["move to travel target"] = &ActionContext::move_to_travel_target;
         creators["move out of collision"] = &ActionContext::move_out_of_collision;
         creators["move random"] = &ActionContext::move_random;
@@ -265,6 +267,8 @@ public:
         creators["rpg trade useful"] = &ActionContext::rpg_trade_useful;
         creators["rpg duel"] = &ActionContext::rpg_duel;
         creators["rpg mount anim"] = &ActionContext::rpg_mount_anim;
+        creators["auction pending items"] = &ActionContext::auction_pending_items;
+        creators["auction buy upgrades"] = &ActionContext::auction_buy_upgrades;
 
         creators["toggle pet spell"] = &ActionContext::toggle_pet_spell;
         creators["pet attack"] = &ActionContext::pet_attack;
@@ -293,6 +297,11 @@ private:
     static Action* move_to_rpg_target(PlayerbotAI* botAI) { return new MoveToRpgTargetAction(botAI); }
     static Action* travel(PlayerbotAI* botAI) { return new TravelAction(botAI); }
     static Action* choose_travel_target(PlayerbotAI* botAI) { return new ChooseTravelTargetAction(botAI); }
+    static Action* choose_auction_house_target(PlayerbotAI* botAI)
+    {
+        return new ChooseAuctionHouseTargetAction(botAI);
+    }
+    static Action* auction_buy_upgrades(PlayerbotAI* botAI) { return new AuctionBuyUpgradesAction(botAI); }
     static Action* move_to_travel_target(PlayerbotAI* botAI) { return new MoveToTravelTargetAction(botAI); }
     static Action* move_out_of_collision(PlayerbotAI* botAI) { return new MoveOutOfCollisionAction(botAI); }
     static Action* move_random(PlayerbotAI* botAI) { return new MoveRandomAction(botAI); }
@@ -472,6 +481,7 @@ private:
     static Action* rpg_trade_useful(PlayerbotAI* botAI) { return new RpgTradeUsefulAction(botAI); }
     static Action* rpg_duel(PlayerbotAI* botAI) { return new RpgDuelAction(botAI); }
     static Action* rpg_mount_anim(PlayerbotAI* botAI) { return new RpgMountAnimAction(botAI); }
+    static Action* auction_pending_items(PlayerbotAI* botAI) { return new AuctionPendingItemsAction(botAI); }
 
     static Action* toggle_pet_spell(PlayerbotAI* ai) { return new TogglePetSpellAutoCastAction(ai); }
     static Action* pet_attack(PlayerbotAI* ai) { return new PetAttackAction(ai); }

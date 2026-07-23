@@ -48,7 +48,8 @@ public:
     ItemUsage Calculate() override;
 
 protected:
-    ItemUsage QueryItemUsageForEquip(ItemTemplate const* proto, int32 randomPropertyId = 0);
+    ItemUsage QueryItemUsageForEquip(ItemTemplate const* proto, int32 randomPropertyId = 0,
+                                     float upgradeThreshold = 0.0f);
     ItemUsage QueryItemUsageForAmmo(ItemTemplate const* proto);
     ParsedItemUsage GetItemIdFromQualifier();
 
@@ -78,6 +79,7 @@ public:
     }
 
     ItemUsage Calculate() override;
+    ItemUsage CalculateWithThreshold(uint32 itemId, int32 randomPropertyId, float upgradeThreshold);
 };
 
 #endif

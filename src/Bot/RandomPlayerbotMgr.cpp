@@ -2364,6 +2364,16 @@ void RandomPlayerbotMgr::SetValue(Player* bot, std::string const& type, uint32 v
     SetValue(bot->GetGUID().GetCounter(), type, value, data);
 }
 
+void RandomPlayerbotMgr::SetPersistentValue(uint32 bot, std::string const& type, uint32 value, std::string const& data)
+{
+    SetEventValue(bot, type, value, 0, data);
+}
+
+void RandomPlayerbotMgr::SetPersistentValue(Player* bot, std::string const& type, uint32 value, std::string const& data)
+{
+    SetPersistentValue(bot->GetGUID().GetCounter(), type, value, data);
+}
+
 bool RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(ChatHandler* /*handler*/, char const* args)
 {
     if (!sPlayerbotAIConfig.enabled)
