@@ -38,10 +38,6 @@ bool AuctionVisitDueTrigger::IsActive()
     if (IsNearAuctioneer(bot, botAI))
         return false;
 
-    TravelTarget* target = AI_VALUE(TravelTarget*, "travel target");
-    if (target && target->isActive())
-        return false;
-
     return true;
 }
 
@@ -54,6 +50,20 @@ bool NearAuctioneerWithAuctionItemsTrigger::IsActive()
         return false;
 
     if (!AI_VALUE(bool, "should visit auction house"))
+        return false;
+
+    return IsNearAuctioneer(bot, botAI);
+}
+
+bool NearAuctioneerForUpgradeBuyingTrigger::IsActive()
+{
+    if (!sPlayerbotAIConfig.auctionBuyerEnabled)
+        return false;
+
+    if (bot->IsInCombat())
+        return false;
+
+    if (!WorldPosition(bot).isOverworld())
         return false;
 
     return IsNearAuctioneer(bot, botAI);

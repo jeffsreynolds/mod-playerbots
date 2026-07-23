@@ -34,4 +34,16 @@ public:
     bool IsActive() override;
 };
 
+class NearAuctioneerForUpgradeBuyingTrigger : public Trigger
+{
+public:
+    NearAuctioneerForUpgradeBuyingTrigger(PlayerbotAI* botAI,
+                                          std::string const name = "near auctioneer for upgrade buying")
+        : Trigger(botAI, name, 2)
+    {
+    }
+
+    bool IsActive() override;
+};
+
 #endif

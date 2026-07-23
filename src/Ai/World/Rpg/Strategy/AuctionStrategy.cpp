@@ -26,4 +26,13 @@ void AuctionStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
             }
         )
     );
+
+    triggers.push_back(
+        new TriggerNode(
+            "near auctioneer for upgrade buying",
+            {
+                NextAction("auction buy upgrades", ACTION_NORMAL)
+            }
+        )
+    );
 }

@@ -328,10 +328,6 @@ bool ChooseAuctionHouseTargetAction::isUseful()
     if (!AI_VALUE(bool, "should visit auction house"))
         return false;
 
-    TravelTarget* target = AI_VALUE(TravelTarget*, "travel target");
-    if (target && target->isActive())
-        return false;
-
     return FindNearbyAuctioneer(bot, botAI) == nullptr;
 }
 
@@ -404,9 +400,6 @@ bool AuctionPendingItemsAction::Execute(Event /*event*/)
 bool AuctionBuyUpgradesAction::isUseful()
 {
     if (!sPlayerbotAIConfig.auctionBuyerEnabled)
-        return false;
-
-    if (!AI_VALUE(bool, "should visit auction house"))
         return false;
 
     return FindNearbyAuctioneer(bot, botAI) != nullptr;

@@ -175,6 +175,7 @@ public:
         creators["near rpg target"] = &TriggerContext::near_rpg_target;
         creators["auction visit due"] = &TriggerContext::auction_visit_due;
         creators["near auctioneer with auction items"] = &TriggerContext::near_auctioneer_with_auction_items;
+        creators["near auctioneer for upgrade buying"] = &TriggerContext::near_auctioneer_for_upgrade_buying;
         creators["no travel target"] = &TriggerContext::no_travel_target;
         creators["far from travel target"] = &TriggerContext::far_from_travel_target;
         creators["no rti target"] = &TriggerContext::no_rti;
@@ -263,6 +264,10 @@ private:
     static Trigger* near_auctioneer_with_auction_items(PlayerbotAI* botAI)
     {
         return new NearAuctioneerWithAuctionItemsTrigger(botAI);
+    }
+    static Trigger* near_auctioneer_for_upgrade_buying(PlayerbotAI* botAI)
+    {
+        return new NearAuctioneerForUpgradeBuyingTrigger(botAI);
     }
     static Trigger* far_from_travel_target(PlayerbotAI* botAI) { return new FarFromTravelTargetTrigger(botAI); }
     static Trigger* no_travel_target(PlayerbotAI* botAI) { return new NoTravelTargetTrigger(botAI); }
