@@ -49,9 +49,6 @@ bool NearAuctioneerWithAuctionItemsTrigger::IsActive()
     if (!AuctionBot::HasPendingAuctionItems(botAI))
         return false;
 
-    if (!AI_VALUE(bool, "should visit auction house"))
-        return false;
-
     return IsNearAuctioneer(bot, botAI);
 }
 
