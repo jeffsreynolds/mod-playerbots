@@ -97,7 +97,7 @@ namespace
         if (!auctioneer)
             return nullptr;
 
-        AuctionHouseEntry const* ahEntry = AuctionHouseMgr::GetAuctionHouseEntry(auctioneer->GetFaction());
+        AuctionHouseEntry const* ahEntry = AuctionHouseMgr::GetAuctionHouseEntryFromFactionTemplate(auctioneer->GetFaction());
         if (!ahEntry)
             return gNeutralConfig;
 
@@ -432,11 +432,11 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     if (!auctioneer)
         return false;
 
-    AuctionHouseEntry const* ahEntry = AuctionHouseMgr::GetAuctionHouseEntry(auctioneer->GetFaction());
+    AuctionHouseEntry const* ahEntry = AuctionHouseMgr::GetAuctionHouseEntryFromFactionTemplate(auctioneer->GetFaction());
     if (!ahEntry)
         return false;
 
-    AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(ahEntry);
+    AuctionHouseObject* auctionHouse = sAuctionMgr->GetAuctionsMap(auctioneer->GetFaction());
     if (!auctionHouse)
         return false;
 
@@ -533,7 +533,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
             auction->Id,
             static_cast<uint32>(offerPrice),
             useBuyout,
-            proto->Quality
+            static_cast<uint8>(proto->Quality)
         });
     }
 

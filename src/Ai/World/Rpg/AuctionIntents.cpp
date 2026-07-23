@@ -78,7 +78,7 @@ namespace AuctionBot
 
             try
             {
-                ObjectGuid itemGuid(std::stoull(fields[0]));
+                ObjectGuid itemGuid(static_cast<uint64>(std::stoull(fields[0])));
                 if (!itemGuid.IsItem())
                     continue;
 
