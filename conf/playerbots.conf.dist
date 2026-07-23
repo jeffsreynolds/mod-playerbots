@@ -2217,6 +2217,9 @@ AiPlayerbot.CommandServerPort = 8888
 AiPlayerbot.SpellDump = 0
 AiPlayerbot.LogInGroupOnly = 1
 AiPlayerbot.LogValuesPerTick = 0
+# Enable detailed randombot auction-house activity logs (sell/buy/visit/intents)
+# Default: 0 (disabled)
+AiPlayerbot.LogAuctionHouseActivity = 0
 AiPlayerbot.RandomChangeMultiplier = 1
 
 # Tell which spell is avoiding (experimental)
