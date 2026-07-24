@@ -6,6 +6,8 @@
 
 #include "ItemUsageValue.h"
 
+#include <array>
+
 #include "AiFactory.h"
 #include "ChatHelper.h"
 #include "GuildTaskMgr.h"
@@ -29,6 +31,60 @@ ItemUsage ItemUsageValue::Calculate()
     ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemId);
     if (!proto)
         return ITEM_USAGE_NONE;
+
+    auto isProfessionMaterial = [proto]() {
+        switch (proto->Class)
+        {
+            case ITEM_CLASS_TRADE_GOODS:
+            case ITEM_CLASS_MISC:
+            case ITEM_CLASS_REAGENT:
+            case ITEM_CLASS_GEM:
+                return true;
+            default:
+                return false;
+        }
+    };
+
+    auto isUsedByAnyTradeSkill = [proto]() {
+        static std::array<uint32, 10> const tradeSkills = {
+            SKILL_TAILORING, SKILL_LEATHERWORKING, SKILL_ENGINEERING, SKILL_BLACKSMITHING, SKILL_ALCHEMY,
+            SKILL_ENCHANTING, SKILL_FISHING, SKILL_FIRST_AID, SKILL_COOKING, SKILL_JEWELCRAFTING
+        };
+
+        for (uint32 skillId : tradeSkills)
+            if (RandomItemMgr::IsUsedBySkill(proto, skillId))
+                return true;
+
+        return false;
+    };
+
+    auto canGiveTradeSkillUp = [this, proto]() {
+        for (uint32 spellId : SpellsUsingItem(proto->ItemId, bot))
+            if (SpellGivesSkillUp(spellId, bot))
+                return true;
+
+        return false;
+    };
+
+    auto isWhiteEquippable = [proto]() {
+        bool isEquipmentClass = proto->Class == ITEM_CLASS_ARMOR || proto->Class == ITEM_CLASS_WEAPON;
+        return isEquipmentClass && proto->InventoryType != INVTYPE_NON_EQUIP && proto->Quality == ITEM_QUALITY_NORMAL;
+    };
+
+    auto isThresholdLimitedConsumable = [this, proto]() {
+        if (proto->Class != ITEM_CLASS_CONSUMABLE)
+            return false;
+
+        std::string const consumableType = GetConsumableType(proto, bot->GetPower(POWER_MANA) > 0);
+        if (consumableType == "food" || consumableType == "drink" || consumableType == "bandage")
+            return false;
+
+        if (consumableType == "mana potion" || consumableType == "healing potion")
+            return true;
+
+        // Remaining usable consumables are treated as utility buffs (stones, kits, oils, scroll-like effects).
+        return bot->CanUseItem(proto) == EQUIP_ERR_OK;
+    };
 
     if (botAI->HasActivePlayerMaster())
     {
@@ -147,6 +203,35 @@ ItemUsage ItemUsageValue::Calculate()
         if (ammoUsage != ITEM_USAGE_NONE)
             return ammoUsage;
     }
+
+    if (proto->Quality == ITEM_QUALITY_POOR)
+        return ITEM_USAGE_VENDOR;
+
+    if (isWhiteEquippable())
+        return ITEM_USAGE_VENDOR;
+
+    if (proto->Class == ITEM_CLASS_CONSUMABLE)
+    {
+        std::string const consumableType = GetConsumableType(proto, bot->GetPower(POWER_MANA) > 0);
+        if (consumableType == "food" || consumableType == "drink")
+            return ITEM_USAGE_VENDOR;
+    }
+
+    if (isThresholdLimitedConsumable())
+    {
+        if (bot->GetItemCount(proto->ItemId, false) <= sPlayerbotAIConfig.auctionConsumableKeepCount)
+            return ITEM_USAGE_KEEP;
+    }
+
+    if (isProfessionMaterial())
+    {
+        if (canGiveTradeSkillUp())
+            return ITEM_USAGE_KEEP;
+
+        if (isUsedByAnyTradeSkill())
+            return ITEM_USAGE_AH;
+    }
+
     // Need to add something like free bagspace or item value.
     if (proto->SellPrice > 0)
     {

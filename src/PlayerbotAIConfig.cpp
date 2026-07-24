@@ -707,6 +707,7 @@ bool PlayerbotAIConfig::Initialize()
     auctionBuyMaxSpendPurple = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionBuyMaxSpendPurple", 75);
     auctionBuyMaxSpendOrange = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionBuyMaxSpendOrange", 0);
     auctionBuyMaxSpendYellow = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionBuyMaxSpendYellow", 0);
+    auctionConsumableKeepCount = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionConsumableKeepCount", 20);
     twoRoundsGearInit = sConfigMgr->GetOption<bool>("AiPlayerbot.TwoRoundsGearInit", false);
     syncQuestWithPlayer = sConfigMgr->GetOption<bool>("AiPlayerbot.SyncQuestWithPlayer", true);
     syncQuestForPlayer = sConfigMgr->GetOption<bool>("AiPlayerbot.SyncQuestForPlayer", false);

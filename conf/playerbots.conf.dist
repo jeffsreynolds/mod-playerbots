@@ -313,6 +313,11 @@ AiPlayerbot.AuctionBuyMaxSpendPurple = 75
 AiPlayerbot.AuctionBuyMaxSpendOrange = 0
 AiPlayerbot.AuctionBuyMaxSpendYellow = 0
 
+# Keep this many total items (not stacks) for potions and temporary buff consumables
+# (e.g. sharpening stones, weapon oils, armor kits) before allowing overflow to be auctioned.
+# Default: 20
+AiPlayerbot.AuctionConsumableKeepCount = 20
+
 # Two rounds of equipment initialization to create more suitable gear
 AiPlayerbot.TwoRoundsGearInit = 0
 

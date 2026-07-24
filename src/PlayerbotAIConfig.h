@@ -381,6 +381,7 @@ public:
     uint32 auctionBuyMaxSpendPurple;
     uint32 auctionBuyMaxSpendOrange;
     uint32 auctionBuyMaxSpendYellow;
+    uint32 auctionConsumableKeepCount;
     bool twoRoundsGearInit;
     bool syncQuestWithPlayer;
     bool syncQuestForPlayer;
