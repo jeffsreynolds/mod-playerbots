@@ -2757,8 +2757,10 @@ void PlayerbotFactory::InitTradeSkills()
     if (!sRandomPlayerbotMgr.IsRandomBot(bot))
         return;
 
-    uint32 const maxPrimaryTradeSkills =
-        std::min<uint32>(2, sWorld->getIntConfig(CONFIG_MAX_PRIMARY_TRADE_SKILL));
+    uint32 const configuredPrimaryTradeSkills =
+        sPlayerbotAIConfig.tradeskillEnabled ? sPlayerbotAIConfig.tradeskillMaxProfessions : 0;
+    uint32 const maxPrimaryTradeSkills = std::min<uint32>(
+        2, std::min<uint32>(configuredPrimaryTradeSkills, sWorld->getIntConfig(CONFIG_MAX_PRIMARY_TRADE_SKILL)));
 
     uint16 firstSkill = sRandomPlayerbotMgr.GetValue(bot, "firstSkill");
     uint16 secondSkill = sRandomPlayerbotMgr.GetValue(bot, "secondSkill");

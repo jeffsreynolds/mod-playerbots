@@ -104,6 +104,27 @@ public:
     bool randomBotAuctionHouse;
     uint32 auctionVisitDelay, auctionVisitMinInterval, auctionVisitRetryDelay, auctionVisitLevelInterval,
         auctionItemsPerVisit, auctionPriceMinPercent, auctionPriceMaxPercent;
+    bool tradeskillEnabled;
+    uint32 tradeskillMaxProfessions;
+    bool tradeskillBuySideControlsEnabled;
+    bool tradeskillSellSideControlsEnabled;
+    bool tradeskillRequireProvenance;
+    bool tradeskillBlockVendorUnlimitedItems;
+    uint32 tradeskillAuctionReserveMoney;
+    uint32 tradeskillAuctionMaxPurchasesPerHour;
+    uint32 tradeskillAuctionMaxPurchasesPerDay;
+    uint32 tradeskillAuctionMaxSpendPerDay;
+    uint32 tradeskillAuctionMaxFactionTransferPerDay;
+    uint32 tradeskillAuctionMaxActiveListingsPerItem;
+    uint32 tradeskillAuctionMaxActiveListingsPerCategory;
+    uint32 tradeskillAuctionMarketFitMaxCompetingListings;
+    uint32 tradeskillUnsoldAuctionCyclesWhite;
+    uint32 tradeskillUnsoldAuctionCyclesGreen;
+    uint32 tradeskillUnsoldAuctionCyclesBlue;
+    uint32 tradeskillUnsoldAuctionCyclesPurple;
+    uint32 tradeskillUnsoldAuctionCyclesOrange;
+    uint32 tradeskillUnsoldAuctionCyclesYellow;
+    std::set<uint32> tradeskillSeededItems;
     bool dynamicReactDelay;
     float sightDistance, spellDistance, reactDistance, grindDistance, lootDistance, shootDistance, fleeDistance,
         tooCloseDistance, meleeDistance, followDistance, whisperDistance, contactDistance, aoeRadius, rpgDistance,

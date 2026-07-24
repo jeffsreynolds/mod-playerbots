@@ -30,7 +30,9 @@ namespace AuctionBot
         uint32 itemEntry = 0;
         uint32 count = 0;
         AuctionIntentState state = AuctionIntentState::Pending;
+        uint32 postAttempts = 0;
         time_t createdAt = 0;
+        time_t lastPostedAt = 0;
         time_t updatedAt = 0;
     };
 
@@ -52,6 +54,8 @@ namespace AuctionBot
     AuctionIntentList& ReconcileAuctionIntents(PlayerbotAI* botAI);
     bool HasPendingAuctionItems(PlayerbotAI* botAI);
     std::vector<Item*> GetPendingAuctionItems(PlayerbotAI* botAI);
+    AuctionIntent* GetAuctionIntent(PlayerbotAI* botAI, ObjectGuid itemGuid);
+    void MarkAuctionIntentPosted(PlayerbotAI* botAI, ObjectGuid itemGuid);
     void SetAuctionIntentState(PlayerbotAI* botAI, ObjectGuid itemGuid, AuctionIntentState state);
     void RemoveAuctionIntent(PlayerbotAI* botAI, ObjectGuid itemGuid);
 }  // namespace AuctionBot

@@ -6,11 +6,36 @@
 
 #include "AuctionIntents.h"
 
+#include "PlayerbotSpellRepository.h"
 #include "ItemUsageValue.h"
 #include "Playerbots.h"
 
 namespace
 {
+    constexpr uint32 AUCTION_POSTED_GRACE_SECONDS = 3 * DAY;
+
+    bool RequiresCraftProvenance(ItemTemplate const* proto)
+    {
+        if (!proto)
+            return false;
+
+        switch (proto->Class)
+        {
+            case ITEM_CLASS_CONSUMABLE:
+            case ITEM_CLASS_TRADE_GOODS:
+            case ITEM_CLASS_GEM:
+            case ITEM_CLASS_RECIPE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool HasCreatorGuid(Item* item)
+    {
+        return item && item->GetUInt64Value(ITEM_FIELD_CREATOR) != 0;
+    }
+
     bool IsEligibleAuctionIntentItem(Player* bot, PlayerbotAI* botAI, Item* item)
     {
         if (!item || bot->GetItemByGuid(item->GetGUID()) != item)
@@ -26,6 +51,21 @@ namespace
         if (!item->CanBeTraded() || item->IsNotEmptyBag() || proto->HasFlag(ITEM_FLAG_CONJURED) ||
             item->GetUInt32Value(ITEM_FIELD_DURATION))
             return false;
+
+        if (sPlayerbotAIConfig.tradeskillSellSideControlsEnabled)
+        {
+            if (sPlayerbotAIConfig.tradeskillBlockVendorUnlimitedItems &&
+                PlayerbotSpellRepository::Instance().IsItemBuyable(item->GetEntry()))
+                return false;
+
+            if (sPlayerbotAIConfig.tradeskillSeededItems.find(item->GetEntry()) !=
+                sPlayerbotAIConfig.tradeskillSeededItems.end())
+                return false;
+
+            if (sPlayerbotAIConfig.tradeskillRequireProvenance && RequiresCraftProvenance(proto) &&
+                !HasCreatorGuid(item))
+                return false;
+        }
 
         ItemUsage usage =
             botAI->GetAiObjectContext()->GetValue<ItemUsage>("item usage", std::to_string(item->GetEntry()))->Get();
@@ -59,7 +99,8 @@ namespace AuctionBot
                 first = false;
 
             out << intent.itemGuid.GetRawValue() << "," << intent.itemEntry << "," << intent.count << ","
-                << static_cast<uint32>(intent.state) << "," << static_cast<uint64>(intent.createdAt) << ","
+                << static_cast<uint32>(intent.state) << "," << intent.postAttempts << ","
+                << static_cast<uint64>(intent.createdAt) << "," << static_cast<uint64>(intent.lastPostedAt) << ","
                 << static_cast<uint64>(intent.updatedAt);
         }
 
@@ -73,7 +114,7 @@ namespace AuctionBot
         for (std::string const& row : split(text, '^'))
         {
             std::vector<std::string> fields = split(row, ',');
-            if (fields.size() != 6)
+            if (fields.size() != 6 && fields.size() != 8)
                 continue;
 
             try
@@ -87,8 +128,20 @@ namespace AuctionBot
                 intent.itemEntry = static_cast<uint32>(std::stoul(fields[1]));
                 intent.count = static_cast<uint32>(std::stoul(fields[2]));
                 intent.state = static_cast<AuctionIntentState>(std::stoul(fields[3]));
-                intent.createdAt = static_cast<time_t>(std::stoull(fields[4]));
-                intent.updatedAt = static_cast<time_t>(std::stoull(fields[5]));
+
+                if (fields.size() == 8)
+                {
+                    intent.postAttempts = static_cast<uint32>(std::stoul(fields[4]));
+                    intent.createdAt = static_cast<time_t>(std::stoull(fields[5]));
+                    intent.lastPostedAt = static_cast<time_t>(std::stoull(fields[6]));
+                    intent.updatedAt = static_cast<time_t>(std::stoull(fields[7]));
+                }
+                else
+                {
+                    intent.createdAt = static_cast<time_t>(std::stoull(fields[4]));
+                    intent.updatedAt = static_cast<time_t>(std::stoull(fields[5]));
+                }
+
                 value.push_back(intent);
             }
             catch (std::exception const&)
@@ -124,21 +177,25 @@ namespace AuctionBot
                     LOG_DEBUG("playerbots.auction",
                               "[SELL][INTENT_MARKED] bot={} item={} guid={} count={} state=pending reason=eligible_item",
                               bot->GetName(), item->GetEntry(), item->GetGUID().ToString(), item->GetCount());
-                value.push_back({item->GetGUID(), item->GetEntry(), item->GetCount(), AuctionIntentState::Pending,
-                                 static_cast<time_t>(now), static_cast<time_t>(now)});
+                value.push_back({item->GetGUID(), item->GetEntry(), item->GetCount(), AuctionIntentState::Pending, 0,
+                                 static_cast<time_t>(now), 0, static_cast<time_t>(now)});
                 continue;
             }
 
             existing->itemEntry = item->GetEntry();
             existing->count = item->GetCount();
             existing->updatedAt = now;
-            if (existing->state == AuctionIntentState::Ignore || existing->state == AuctionIntentState::Posted)
+            if (existing->state == AuctionIntentState::Posted)
                 existing->state = AuctionIntentState::Pending;
         }
 
-        value.erase(std::remove_if(value.begin(), value.end(), [&eligibleGuids](AuctionIntent const& intent) {
+        value.erase(std::remove_if(value.begin(), value.end(), [&eligibleGuids, now](AuctionIntent const& intent) {
                         if (eligibleGuids.find(intent.itemGuid) == eligibleGuids.end())
                         {
+                            if (intent.state == AuctionIntentState::Posted &&
+                                (now - static_cast<uint32>(intent.updatedAt)) < AUCTION_POSTED_GRACE_SECONDS)
+                                return false;
+
                             if (sPlayerbotAIConfig.logAuctionHouseActivity)
                                 LOG_DEBUG("playerbots.auction",
                                           "[SELL][INTENT_REMOVED] item={} guid={} reason=no_longer_eligible_or_missing",
@@ -192,24 +249,42 @@ namespace AuctionBot
         return items;
     }
 
-    void SetAuctionIntentState(PlayerbotAI* botAI, ObjectGuid itemGuid, AuctionIntentState state)
+    AuctionIntent* GetAuctionIntent(PlayerbotAI* botAI, ObjectGuid itemGuid)
     {
         AuctionIntentsValue* intentsValue = GetAuctionIntentsValue(botAI);
         if (!intentsValue)
-            return;
+            return nullptr;
 
         AuctionIntentList& intents = intentsValue->Get();
-        uint32 now = static_cast<uint32>(time(nullptr));
+        auto itr = std::find_if(intents.begin(), intents.end(), [itemGuid](AuctionIntent const& intent) {
+            return intent.itemGuid == itemGuid;
+        });
 
-        for (AuctionIntent& intent : intents)
-        {
-            if (intent.itemGuid != itemGuid)
-                continue;
+        return itr == intents.end() ? nullptr : &(*itr);
+    }
 
-            intent.state = state;
-            intent.updatedAt = now;
+    void MarkAuctionIntentPosted(PlayerbotAI* botAI, ObjectGuid itemGuid)
+    {
+        AuctionIntent* intent = GetAuctionIntent(botAI, itemGuid);
+        if (!intent)
             return;
-        }
+
+        uint32 now = static_cast<uint32>(time(nullptr));
+        intent->postAttempts += 1;
+        intent->state = AuctionIntentState::Posted;
+        intent->lastPostedAt = now;
+        intent->updatedAt = now;
+    }
+
+    void SetAuctionIntentState(PlayerbotAI* botAI, ObjectGuid itemGuid, AuctionIntentState state)
+    {
+        AuctionIntent* intent = GetAuctionIntent(botAI, itemGuid);
+        if (!intent)
+            return;
+
+        uint32 now = static_cast<uint32>(time(nullptr));
+        intent->state = state;
+        intent->updatedAt = now;
     }
 
     void RemoveAuctionIntent(PlayerbotAI* botAI, ObjectGuid itemGuid)

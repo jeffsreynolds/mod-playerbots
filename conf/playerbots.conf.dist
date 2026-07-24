@@ -318,6 +318,54 @@ AiPlayerbot.AuctionBuyMaxSpendYellow = 0
 # Default: 20
 AiPlayerbot.AuctionConsumableKeepCount = 20
 
+# Tradeskill economy governance settings.
+# These controls apply to random-bot auction buy/sell behavior to keep the economy stable.
+
+# Master switch for tradeskill economy features.
+# Default: 1 (enabled)
+AiPlayerbot.TradeskillEnabled = 1
+
+# Max primary professions that tradeskill activity may manage on one bot.
+# Effective limit is min(this value, worldserver CONFIG_MAX_PRIMARY_TRADE_SKILL).
+# Default: 2
+AiPlayerbot.TradeskillMaxProfessions = 2
+
+# Master switches for buy and sell controls.
+# Default: 1 (enabled)
+AiPlayerbot.TradeskillBuySideControlsEnabled = 1
+AiPlayerbot.TradeskillSellSideControlsEnabled = 1
+
+# Require item provenance for non-equipment craft goods and block unlimited-vendor stock.
+# Default: 1 (enabled)
+AiPlayerbot.TradeskillRequireProvenance = 1
+AiPlayerbot.TradeskillBlockVendorUnlimitedItems = 1
+
+# Comma-separated item entries considered seeded/generated utility stock.
+# These entries are never listed by tradeskill seller flow.
+# Default: empty
+AiPlayerbot.TradeskillSeededItems =
+
+# Buy-side limits (values are copper for money fields).
+# Default reserve: 500000 (50g)
+AiPlayerbot.TradeskillAuctionReserveMoney = 500000
+AiPlayerbot.TradeskillAuctionMaxPurchasesPerHour = 3
+AiPlayerbot.TradeskillAuctionMaxPurchasesPerDay = 12
+AiPlayerbot.TradeskillAuctionMaxSpendPerDay = 2000000
+AiPlayerbot.TradeskillAuctionMaxFactionTransferPerDay = 10000000
+
+# Sell-side listing controls.
+AiPlayerbot.TradeskillAuctionMaxActiveListingsPerItem = 3
+AiPlayerbot.TradeskillAuctionMaxActiveListingsPerCategory = 12
+AiPlayerbot.TradeskillAuctionMarketFitMaxCompetingListings = 30
+
+# Unsold auction cycle caps by quality (default all 1).
+AiPlayerbot.TradeskillUnsoldAuctionCyclesWhite = 1
+AiPlayerbot.TradeskillUnsoldAuctionCyclesGreen = 1
+AiPlayerbot.TradeskillUnsoldAuctionCyclesBlue = 1
+AiPlayerbot.TradeskillUnsoldAuctionCyclesPurple = 1
+AiPlayerbot.TradeskillUnsoldAuctionCyclesOrange = 1
+AiPlayerbot.TradeskillUnsoldAuctionCyclesYellow = 1
+
 # Two rounds of equipment initialization to create more suitable gear
 AiPlayerbot.TwoRoundsGearInit = 0
 

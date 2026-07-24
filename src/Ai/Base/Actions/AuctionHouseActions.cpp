@@ -8,7 +8,9 @@
 
 #include <algorithm>
 #include <limits>
+#include <mutex>
 #include <optional>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "AuctionHouseMgr.h"
@@ -16,6 +18,7 @@
 #include "AuctionValues.h"
 #include "ItemUsageValue.h"
 #include "Opcodes.h"
+#include "PlayerbotSpellRepository.h"
 #include "Playerbots.h"
 
 #if __has_include("AuctionHouseBotConfig.h") && __has_include("AuctionHouseBotCommon.h")
@@ -29,6 +32,11 @@
 namespace
 {
     constexpr uint32 AUCTION_DURATION_MINUTES = 24 * 60;
+    constexpr uint32 SECONDS_PER_HOUR = 60 * MINUTE;
+    constexpr uint32 SECONDS_PER_DAY = 24 * HOUR;
+    std::mutex gFactionSpendLock;
+    uint32 gFactionSpendDayStart = 0;
+    std::unordered_map<uint32, uint64> gFactionDailySpend;
 
     struct AuctionListingPrice
     {
@@ -39,6 +47,243 @@ namespace
     bool IsAuctionActivityLoggingEnabled()
     {
         return sPlayerbotAIConfig.logAuctionHouseActivity;
+    }
+
+    bool RequiresCraftProvenance(ItemTemplate const* proto)
+    {
+        if (!proto)
+            return false;
+
+        switch (proto->Class)
+        {
+            case ITEM_CLASS_CONSUMABLE:
+            case ITEM_CLASS_TRADE_GOODS:
+            case ITEM_CLASS_GEM:
+            case ITEM_CLASS_RECIPE:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool HasCreatorGuid(Item* item)
+    {
+        return item && item->GetUInt64Value(ITEM_FIELD_CREATOR) != 0;
+    }
+
+    uint32 GetUnsoldCycleLimitByQuality(uint8 quality)
+    {
+        switch (quality)
+        {
+            case ITEM_QUALITY_NORMAL:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesWhite;
+            case ITEM_QUALITY_UNCOMMON:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesGreen;
+            case ITEM_QUALITY_RARE:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesBlue;
+            case ITEM_QUALITY_EPIC:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesPurple;
+            case ITEM_QUALITY_LEGENDARY:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesOrange;
+            case ITEM_QUALITY_ARTIFACT:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesYellow;
+            default:
+                return sPlayerbotAIConfig.tradeskillUnsoldAuctionCyclesWhite;
+        }
+    }
+
+    bool IsItemBlockedByTradeskillSellPolicy(Item* item)
+    {
+        if (!item)
+            return true;
+
+        ItemTemplate const* proto = item->GetTemplate();
+        if (!proto)
+            return true;
+
+        if (!sPlayerbotAIConfig.tradeskillSellSideControlsEnabled)
+            return false;
+
+        if (sPlayerbotAIConfig.tradeskillBlockVendorUnlimitedItems &&
+            PlayerbotSpellRepository::Instance().IsItemBuyable(item->GetEntry()))
+            return true;
+
+        if (sPlayerbotAIConfig.tradeskillSeededItems.find(item->GetEntry()) !=
+            sPlayerbotAIConfig.tradeskillSeededItems.end())
+            return true;
+
+        if (sPlayerbotAIConfig.tradeskillRequireProvenance && RequiresCraftProvenance(proto) && !HasCreatorGuid(item))
+            return true;
+
+        return false;
+    }
+
+    AuctionHouseObject* GetAuctionHouseForAuctioneer(Creature* auctioneer)
+    {
+        if (!auctioneer)
+            return nullptr;
+
+        return sAuctionMgr->GetAuctionsMap(auctioneer->GetFaction());
+    }
+
+    bool CanListBySellControls(Player* bot, Creature* auctioneer, Item* item, std::string& reason)
+    {
+        if (!sPlayerbotAIConfig.tradeskillSellSideControlsEnabled)
+            return true;
+
+        AuctionHouseObject* auctionHouse = GetAuctionHouseForAuctioneer(auctioneer);
+        ItemTemplate const* proto = item ? item->GetTemplate() : nullptr;
+        if (!auctionHouse || !item || !proto)
+        {
+            reason = "missing_auction_context";
+            return false;
+        }
+
+        uint32 ownEntryListings = 0;
+        uint32 ownCategoryListings = 0;
+        uint32 marketEntryListings = 0;
+
+        for (AuctionHouseObject::AuctionEntryMap::const_iterator itr = auctionHouse->GetAuctionsBegin();
+             itr != auctionHouse->GetAuctionsEnd(); ++itr)
+        {
+            AuctionEntry* auction = itr->second;
+            if (!auction)
+                continue;
+
+            Item* auctionItem = sAuctionMgr->GetAItem(auction->item_guid);
+            if (!auctionItem)
+                continue;
+
+            ItemTemplate const* auctionProto = auctionItem->GetTemplate();
+            if (!auctionProto)
+                continue;
+
+            if (auctionItem->GetEntry() == item->GetEntry())
+            {
+                ++marketEntryListings;
+                if (auction->owner == bot->GetGUID())
+                    ++ownEntryListings;
+            }
+
+            if (auctionProto->Class == proto->Class && auction->owner == bot->GetGUID())
+                ++ownCategoryListings;
+        }
+
+        if (sPlayerbotAIConfig.tradeskillAuctionMaxActiveListingsPerItem > 0 &&
+            ownEntryListings >= sPlayerbotAIConfig.tradeskillAuctionMaxActiveListingsPerItem)
+        {
+            reason = "per_item_cap";
+            return false;
+        }
+
+        if (sPlayerbotAIConfig.tradeskillAuctionMaxActiveListingsPerCategory > 0 &&
+            ownCategoryListings >= sPlayerbotAIConfig.tradeskillAuctionMaxActiveListingsPerCategory)
+        {
+            reason = "per_category_cap";
+            return false;
+        }
+
+        if (sPlayerbotAIConfig.tradeskillAuctionMarketFitMaxCompetingListings > 0 &&
+            marketEntryListings >= sPlayerbotAIConfig.tradeskillAuctionMarketFitMaxCompetingListings)
+        {
+            reason = "market_fit_rejected";
+            return false;
+        }
+
+        return true;
+    }
+
+    struct BuyerBudgetState
+    {
+        uint32 hourWindowStart = 0;
+        uint32 dayWindowStart = 0;
+        uint32 purchasesThisHour = 0;
+        uint32 purchasesToday = 0;
+        uint64 spendToday = 0;
+    };
+
+    BuyerBudgetState LoadBuyerBudgetState(Player* bot)
+    {
+        BuyerBudgetState state;
+        if (!bot)
+            return state;
+
+        state.hourWindowStart = sRandomPlayerbotMgr.GetValue(bot, "ah_buy_hour_start");
+        state.dayWindowStart = sRandomPlayerbotMgr.GetValue(bot, "ah_buy_day_start");
+        state.purchasesThisHour = sRandomPlayerbotMgr.GetValue(bot, "ah_buy_hour_count");
+        state.purchasesToday = sRandomPlayerbotMgr.GetValue(bot, "ah_buy_day_count");
+        state.spendToday = sRandomPlayerbotMgr.GetValue(bot, "ah_buy_day_spend");
+        return state;
+    }
+
+    void SaveBuyerBudgetState(Player* bot, BuyerBudgetState const& state)
+    {
+        if (!bot)
+            return;
+
+        sRandomPlayerbotMgr.SetPersistentValue(bot, "ah_buy_hour_start", state.hourWindowStart);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, "ah_buy_day_start", state.dayWindowStart);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, "ah_buy_hour_count", state.purchasesThisHour);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, "ah_buy_day_count", state.purchasesToday);
+        sRandomPlayerbotMgr.SetPersistentValue(bot, "ah_buy_day_spend", static_cast<uint32>(state.spendToday));
+    }
+
+    void NormalizeBuyerBudgetWindows(uint32 now, BuyerBudgetState& state)
+    {
+        if (!state.hourWindowStart || now >= state.hourWindowStart + SECONDS_PER_HOUR)
+        {
+            state.hourWindowStart = now;
+            state.purchasesThisHour = 0;
+        }
+
+        if (!state.dayWindowStart || now >= state.dayWindowStart + SECONDS_PER_DAY)
+        {
+            state.dayWindowStart = now;
+            state.purchasesToday = 0;
+            state.spendToday = 0;
+        }
+    }
+
+    bool CanSpendByFactionDailyCap(Player* bot, uint64 spend)
+    {
+        if (!bot)
+            return false;
+
+        if (!sPlayerbotAIConfig.tradeskillBuySideControlsEnabled ||
+            !sPlayerbotAIConfig.tradeskillAuctionMaxFactionTransferPerDay)
+            return true;
+
+        std::lock_guard<std::mutex> lock(gFactionSpendLock);
+        uint32 now = static_cast<uint32>(time(nullptr));
+        if (!gFactionSpendDayStart || now >= gFactionSpendDayStart + SECONDS_PER_DAY)
+        {
+            gFactionSpendDayStart = now;
+            gFactionDailySpend.clear();
+        }
+
+        uint32 faction = static_cast<uint32>(bot->GetTeamId());
+        uint64 used = gFactionDailySpend[faction];
+        if (used + spend > sPlayerbotAIConfig.tradeskillAuctionMaxFactionTransferPerDay)
+            return false;
+
+        return true;
+    }
+
+    void RecordFactionSpend(Player* bot, uint64 spend)
+    {
+        if (!bot || !sPlayerbotAIConfig.tradeskillBuySideControlsEnabled)
+            return;
+
+        std::lock_guard<std::mutex> lock(gFactionSpendLock);
+        uint32 now = static_cast<uint32>(time(nullptr));
+        if (!gFactionSpendDayStart || now >= gFactionSpendDayStart + SECONDS_PER_DAY)
+        {
+            gFactionSpendDayStart = now;
+            gFactionDailySpend.clear();
+        }
+
+        uint32 faction = static_cast<uint32>(bot->GetTeamId());
+        gFactionDailySpend[faction] += spend;
     }
 
     Creature* FindNearbyAuctioneer(Player* bot, PlayerbotAI* botAI)
@@ -69,6 +314,9 @@ namespace
 
         if (!item->CanBeTraded() || item->IsNotEmptyBag() || proto->HasFlag(ITEM_FLAG_CONJURED) ||
             item->GetUInt32Value(ITEM_FIELD_DURATION) || sAuctionMgr->GetAItem(item->GetGUID()))
+            return false;
+
+        if (IsItemBlockedByTradeskillSellPolicy(item))
             return false;
 
         ItemUsage usage =
@@ -398,6 +646,23 @@ bool AuctionPendingItemsAction::Execute(Event /*event*/)
         if (posted >= std::max<uint32>(1, sPlayerbotAIConfig.auctionItemsPerVisit))
             break;
 
+        AuctionBot::AuctionIntent* intent = AuctionBot::GetAuctionIntent(botAI, item->GetGUID());
+        ItemTemplate const* proto = item ? item->GetTemplate() : nullptr;
+        if (intent && proto && sPlayerbotAIConfig.tradeskillSellSideControlsEnabled)
+        {
+            uint32 maxCycles = GetUnsoldCycleLimitByQuality(proto->Quality);
+            if (intent->postAttempts >= maxCycles)
+            {
+                if (IsAuctionActivityLoggingEnabled())
+                    LOG_DEBUG("playerbots.auction",
+                              "[SELL][PLACE_SKIPPED] bot={} item={} guid={} reason=unsold_cycle_limit_reached attempts={} maxCycles={}",
+                              bot->GetName(), item->GetEntry(), item->GetGUID().ToString(), intent->postAttempts,
+                              maxCycles);
+                AuctionBot::SetAuctionIntentState(botAI, item->GetGUID(), AuctionBot::AuctionIntentState::Ignore);
+                continue;
+            }
+        }
+
         if (!CanStillAuction(bot, botAI, item))
         {
             if (IsAuctionActivityLoggingEnabled())
@@ -405,6 +670,17 @@ bool AuctionPendingItemsAction::Execute(Event /*event*/)
                           bot->GetName(), item ? item->GetEntry() : 0,
                           item ? item->GetGUID().ToString() : ObjectGuid::Empty.ToString());
             AuctionBot::RemoveAuctionIntent(botAI, item->GetGUID());
+            continue;
+        }
+
+        std::string sellPolicyReason;
+        if (!CanListBySellControls(bot, auctioneer, item, sellPolicyReason))
+        {
+            if (IsAuctionActivityLoggingEnabled())
+                LOG_DEBUG("playerbots.auction",
+                          "[SELL][PLACE_SKIPPED] bot={} item={} guid={} reason={} sell_controls=1",
+                          bot->GetName(), item->GetEntry(), item->GetGUID().ToString(), sellPolicyReason);
+            AuctionBot::SetAuctionIntentState(botAI, item->GetGUID(), AuctionBot::AuctionIntentState::Pending);
             continue;
         }
 
@@ -416,7 +692,7 @@ bool AuctionPendingItemsAction::Execute(Event /*event*/)
             continue;
         }
 
-        AuctionBot::SetAuctionIntentState(botAI, item->GetGUID(), AuctionBot::AuctionIntentState::Posted);
+        AuctionBot::MarkAuctionIntentPosted(botAI, item->GetGUID());
         ++posted;
     }
 
@@ -467,6 +743,22 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     Creature* auctioneer = FindNearbyAuctioneer(bot, botAI);
     if (!auctioneer)
         return false;
+
+    BuyerBudgetState budgetState = LoadBuyerBudgetState(bot);
+    uint32 now = static_cast<uint32>(time(nullptr));
+    NormalizeBuyerBudgetWindows(now, budgetState);
+    SaveBuyerBudgetState(bot, budgetState);
+
+    if (sPlayerbotAIConfig.tradeskillBuySideControlsEnabled)
+    {
+        if (sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerHour > 0 &&
+            budgetState.purchasesThisHour >= sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerHour)
+            return false;
+
+        if (sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerDay > 0 &&
+            budgetState.purchasesToday >= sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerDay)
+            return false;
+    }
 
     if (IsAuctionActivityLoggingEnabled())
         LOG_DEBUG("playerbots.auction", "[BUY][VISIT_EXECUTED] bot={} auctioneer={}",
@@ -616,6 +908,30 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
             continue;
 
         uint64 money = bot->GetMoney();
+        if (sPlayerbotAIConfig.tradeskillBuySideControlsEnabled)
+        {
+            if (money <= sPlayerbotAIConfig.tradeskillAuctionReserveMoney)
+                continue;
+
+            if (money - candidate.offerPrice < sPlayerbotAIConfig.tradeskillAuctionReserveMoney)
+                continue;
+
+            if (sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerHour > 0 &&
+                budgetState.purchasesThisHour >= sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerHour)
+                break;
+
+            if (sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerDay > 0 &&
+                budgetState.purchasesToday >= sPlayerbotAIConfig.tradeskillAuctionMaxPurchasesPerDay)
+                break;
+
+            if (sPlayerbotAIConfig.tradeskillAuctionMaxSpendPerDay > 0 &&
+                budgetState.spendToday + candidate.offerPrice > sPlayerbotAIConfig.tradeskillAuctionMaxSpendPerDay)
+                continue;
+
+            if (!CanSpendByFactionDailyCap(bot, candidate.offerPrice))
+                continue;
+        }
+
         uint64 rarityCap = money * spendCapPercent / 100;
         if (!rarityCap || candidate.offerPrice > rarityCap || candidate.offerPrice > money)
             continue;
@@ -659,6 +975,14 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
                       offerPrice);
 
         purchasedItemEntries.insert(candidate.itemEntry);
+        if (sPlayerbotAIConfig.tradeskillBuySideControlsEnabled)
+        {
+            ++budgetState.purchasesThisHour;
+            ++budgetState.purchasesToday;
+            budgetState.spendToday += offerPrice;
+            SaveBuyerBudgetState(bot, budgetState);
+            RecordFactionSpend(bot, offerPrice);
+        }
         ++boughtCount;
     }
 

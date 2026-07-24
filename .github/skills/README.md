@@ -69,6 +69,23 @@ This folder contains reusable implementation skills for Playerbots work in this 
 
 ---
 
+### 6) `tradeskill-economy-governance`
+**Use when:** You are implementing tradeskill economy guardrails (provenance checks, anti-faucet source blocking, buy-side throttles, sell-side caps, and unsold-cycle controls).
+
+**Covers:**
+- tradeskill config governance in `PlayerbotAIConfig` + `playerbots.conf.dist`
+- vendor-unlimited and seeded-item auction blocking
+- creator-based provenance gates for craft-good classes
+- listing caps, market-fit caps, relist/unsold-cycle controls
+- per-bot and faction-scoped auction buy throttles and reserve-money checks
+
+**Good prompts:**
+- "Add/adjust tradeskill buy-side and sell-side economic controls."
+- "Harden auction listing eligibility for tradeskill outputs."
+- "Tune unsold-cycle behavior by rarity and keep core auction safety path intact."
+
+---
+
 ## Suggested Workflow for the AH Activity Plan
 
 1. `plan-analysis`
@@ -76,6 +93,7 @@ This folder contains reusable implementation skills for Playerbots work in this 
 3. `random-bot-activity-scheduling`
 4. `playerbot-rpg-travel-strategies`
 5. `azerothcore-auction-transaction-safety`
+6. `tradeskill-economy-governance`
 
 ## Notes
 

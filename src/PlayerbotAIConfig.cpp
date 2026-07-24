@@ -90,6 +90,41 @@ bool PlayerbotAIConfig::Initialize()
     auctionItemsPerVisit = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionItemsPerVisit", 5);
     auctionPriceMinPercent = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionPriceMinPercent", 90);
     auctionPriceMaxPercent = sConfigMgr->GetOption<uint32>("AiPlayerbot.AuctionPriceMaxPercent", 120);
+    tradeskillEnabled = sConfigMgr->GetOption<bool>("AiPlayerbot.TradeskillEnabled", true);
+    tradeskillMaxProfessions = std::min<uint32>(2, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillMaxProfessions", 2));
+    tradeskillBuySideControlsEnabled = sConfigMgr->GetOption<bool>("AiPlayerbot.TradeskillBuySideControlsEnabled", true);
+    tradeskillSellSideControlsEnabled = sConfigMgr->GetOption<bool>("AiPlayerbot.TradeskillSellSideControlsEnabled", true);
+    tradeskillRequireProvenance = sConfigMgr->GetOption<bool>("AiPlayerbot.TradeskillRequireProvenance", true);
+    tradeskillBlockVendorUnlimitedItems =
+        sConfigMgr->GetOption<bool>("AiPlayerbot.TradeskillBlockVendorUnlimitedItems", true);
+    tradeskillAuctionReserveMoney = sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionReserveMoney", 500000);
+    tradeskillAuctionMaxPurchasesPerHour =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxPurchasesPerHour", 3);
+    tradeskillAuctionMaxPurchasesPerDay =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxPurchasesPerDay", 12);
+    tradeskillAuctionMaxSpendPerDay = sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxSpendPerDay", 2000000);
+    tradeskillAuctionMaxFactionTransferPerDay =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxFactionTransferPerDay", 10000000);
+    tradeskillAuctionMaxActiveListingsPerItem =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxActiveListingsPerItem", 3);
+    tradeskillAuctionMaxActiveListingsPerCategory =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxActiveListingsPerCategory", 12);
+    tradeskillAuctionMarketFitMaxCompetingListings =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMarketFitMaxCompetingListings", 30);
+    tradeskillUnsoldAuctionCyclesWhite =
+        std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesWhite", 1));
+    tradeskillUnsoldAuctionCyclesGreen =
+        std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesGreen", 1));
+    tradeskillUnsoldAuctionCyclesBlue =
+        std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesBlue", 1));
+    tradeskillUnsoldAuctionCyclesPurple =
+        std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesPurple", 1));
+    tradeskillUnsoldAuctionCyclesOrange =
+        std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesOrange", 1));
+    tradeskillUnsoldAuctionCyclesYellow =
+        std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesYellow", 1));
+    LoadSet<std::set<uint32>>(sConfigMgr->GetOption<std::string>("AiPlayerbot.TradeskillSeededItems", ""),
+                              tradeskillSeededItems);
     sitDelay = sConfigMgr->GetOption<int32>("AiPlayerbot.SitDelay", 20000);
     returnDelay = sConfigMgr->GetOption<int32>("AiPlayerbot.ReturnDelay", 2000);
     lootDelay = sConfigMgr->GetOption<int32>("AiPlayerbot.LootDelay", 1000);
