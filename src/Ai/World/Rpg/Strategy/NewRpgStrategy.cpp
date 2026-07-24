@@ -20,6 +20,15 @@ void NewRpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     triggers.push_back(
         new TriggerNode(
+            "random bot update",
+            {
+                NextAction("tradeskill planner", 0.25f)
+            }
+        )
+    );
+
+    triggers.push_back(
+        new TriggerNode(
             "go grind status",
             {
                 NextAction("new rpg go grind", 3.0f)

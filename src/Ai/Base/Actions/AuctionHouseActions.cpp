@@ -20,6 +20,7 @@
 #include "Opcodes.h"
 #include "PlayerbotSpellRepository.h"
 #include "Playerbots.h"
+#include "TradeskillMaterialIntents.h"
 
 #if __has_include("AuctionHouseBotConfig.h") && __has_include("AuctionHouseBotCommon.h")
 #include "AuctionHouseBotConfig.h"
@@ -540,6 +541,170 @@ namespace
         bot->GetSession()->HandleAuctionPlaceBid(packet);
         return true;
     }
+
+    struct MaterialDemand
+    {
+        uint32 remainingDeficit = 0;
+        uint32 maxSpend = 0;
+    };
+
+    uint32 NextMaterialFallbackDelay(uint32 attempts)
+    {
+        uint32 shift = std::min<uint32>(attempts, 4u);
+        uint32 delay = 2 * MINUTE * (1u << shift);
+        return std::min<uint32>(delay, 30 * MINUTE);
+    }
+
+    std::unordered_map<uint32, MaterialDemand> BuildMaterialDemandMap(PlayerbotAI* botAI)
+    {
+        std::unordered_map<uint32, MaterialDemand> demand;
+
+        for (TradeskillBot::TradeskillMaterialIntent const& intent :
+             TradeskillBot::GetMaterialIntents(botAI))
+        {
+            if (!intent.itemEntry || !intent.deficitCount)
+                continue;
+
+            MaterialDemand& entryDemand = demand[intent.itemEntry];
+            entryDemand.remainingDeficit += intent.deficitCount;
+            entryDemand.maxSpend += intent.maxSpend;
+        }
+
+        return demand;
+    }
+
+    void ReconcileMaterialIntentsFromDemand(PlayerbotAI* botAI,
+                                            std::unordered_map<uint32, MaterialDemand> const& demand)
+    {
+        TradeskillBot::TradeskillMaterialIntentList& intents = TradeskillBot::GetMaterialIntents(botAI);
+        if (intents.empty())
+            return;
+
+        uint32 now = static_cast<uint32>(time(nullptr));
+
+        for (auto intentItr = intents.begin(); intentItr != intents.end();)
+        {
+            auto demandItr = demand.find(intentItr->itemEntry);
+            if (demandItr == demand.end() || demandItr->second.remainingDeficit == 0)
+            {
+                intentItr = intents.erase(intentItr);
+                continue;
+            }
+
+            uint32 previousDeficit = intentItr->deficitCount;
+            uint32 desiredDeficit = demandItr->second.remainingDeficit;
+            uint32 ownedNow =
+                AI_VALUE2(uint32, "item count", std::to_string(intentItr->itemEntry));
+            uint32 nextRequiredCount = ownedNow + desiredDeficit;
+
+            if (nextRequiredCount < intentItr->requiredCount)
+                nextRequiredCount = intentItr->requiredCount;
+
+            intentItr->ownedCount = ownedNow;
+            intentItr->requiredCount = nextRequiredCount;
+            intentItr->deficitCount = desiredDeficit;
+            if (desiredDeficit < previousDeficit)
+            {
+                intentItr->fallbackAttempts = 0;
+                intentItr->nextFallbackAt = 0;
+            }
+            intentItr->updatedAt = now;
+            ++intentItr;
+        }
+    }
+
+    bool IsGatheringIntentForBot(Player* bot, TradeskillBot::TradeskillMaterialIntent const& intent)
+    {
+        if (!bot || !intent.deficitCount)
+            return false;
+
+        switch (intent.sourceSkill)
+        {
+            case SKILL_MINING:
+                return bot->HasSkill(SKILL_MINING) && bot->GetSkillValue(SKILL_MINING) > 0;
+            case SKILL_HERBALISM:
+                return bot->HasSkill(SKILL_HERBALISM) && bot->GetSkillValue(SKILL_HERBALISM) > 0;
+            case SKILL_SKINNING:
+                return bot->HasSkill(SKILL_SKINNING) && bot->GetSkillValue(SKILL_SKINNING) > 0;
+            default:
+                return false;
+        }
+    }
+
+    bool ScheduleMaterialGatherFallback(Player* bot, PlayerbotAI* botAI)
+    {
+        if (!bot || !botAI || !botAI->AllowActivity(TRAVEL_ACTIVITY) || botAI->HasActivePlayerMaster())
+            return false;
+
+        TradeskillBot::TradeskillMaterialIntentList& intents = TradeskillBot::GetMaterialIntents(botAI);
+        uint32 now = static_cast<uint32>(time(nullptr));
+        TradeskillBot::TradeskillMaterialIntent* selectedIntent = nullptr;
+
+        for (TradeskillBot::TradeskillMaterialIntent& intent : intents)
+        {
+            if (!IsGatheringIntentForBot(bot, intent))
+                continue;
+
+            if (intent.nextFallbackAt && now < static_cast<uint32>(intent.nextFallbackAt))
+                continue;
+
+            if (!selectedIntent || intent.updatedAt < selectedIntent->updatedAt)
+                selectedIntent = &intent;
+        }
+
+        if (!selectedIntent)
+            return false;
+
+        TravelTarget* target = botAI->GetAiObjectContext()->GetValue<TravelTarget*>("travel target")->Get();
+        if (!target)
+            return false;
+
+        WorldPosition botPos(bot);
+        TravelDestination* bestDestination = nullptr;
+        WorldPosition* bestPoint = nullptr;
+        float bestDistance = std::numeric_limits<float>::max();
+
+        for (TravelDestination* destination : TravelMgr::instance().getGrindTravelDestinations(bot, true))
+        {
+            if (!destination)
+                continue;
+
+            WorldPosition* candidatePoint = destination->nearestPoint(&botPos);
+            if (!candidatePoint)
+                continue;
+
+            float distance = botPos.distance(candidatePoint);
+            if (candidatePoint->GetMapId() != botPos.GetMapId())
+                distance += 100000.0f;
+
+            if (distance >= bestDistance)
+                continue;
+
+            bestDestination = destination;
+            bestPoint = candidatePoint;
+            bestDistance = distance;
+        }
+
+        if (!bestDestination || !bestPoint)
+            return false;
+
+        selectedIntent->fallbackAttempts += 1;
+        selectedIntent->nextFallbackAt = now + NextMaterialFallbackDelay(selectedIntent->fallbackAttempts);
+        selectedIntent->updatedAt = now;
+
+        target->setTarget(bestDestination, bestPoint);
+        target->setForced(true);
+        target->setStatus(TRAVEL_STATUS_TRAVEL);
+
+        if (IsAuctionActivityLoggingEnabled())
+            LOG_DEBUG("playerbots.auction",
+                      "[BUY][MATERIAL_FALLBACK] bot={} skill={} item={} destination={} map={} attempts={} nextFallbackAt={} remainingIntents={}",
+                      bot->GetName(), selectedIntent->sourceSkill, selectedIntent->itemEntry,
+                      bestDestination->getTitle(), bestPoint->GetMapId(), selectedIntent->fallbackAttempts,
+                      static_cast<uint32>(selectedIntent->nextFallbackAt), intents.size());
+
+        return true;
+    }
 }
 
 bool ChooseAuctionHouseTargetAction::Execute(Event /*event*/)
@@ -778,14 +943,18 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
                                                 sPlayerbotAIConfig.auctionBuyPriceMaxPercent);
     uint64 minWindowPercent = std::min<uint32>(sPlayerbotAIConfig.auctionBuyPriceMinPercent,
                                                 sPlayerbotAIConfig.auctionBuyPriceMaxPercent);
+    std::unordered_map<uint32, MaterialDemand> materialDemand = BuildMaterialDemandMap(botAI);
 
     struct AuctionBuyCandidate
     {
         uint32 auctionId = 0;
         uint32 itemEntry = 0;
+        uint32 stackCount = 0;
         uint32 offerPrice = 0;
         bool buyout = false;
         uint8 quality = ITEM_QUALITY_POOR;
+        bool isMaterialIntent = false;
+        uint32 intentMaxSpend = 0;
     };
 
     std::vector<AuctionBuyCandidate> candidates;
@@ -816,7 +985,14 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
             continue;
 
         if (GetBuyerSpendCapPercent(proto->Quality) == 0)
-            continue;
+        {
+            auto demandItr = materialDemand.find(proto->ItemId);
+            if (demandItr == materialDemand.end() || demandItr->second.remainingDeficit == 0)
+                continue;
+        }
+
+        auto demandItr = materialDemand.find(proto->ItemId);
+        bool isMaterialIntent = demandItr != materialDemand.end() && demandItr->second.remainingDeficit > 0;
 
         ItemUsage usage = upgradeEvaluator.CalculateWithThreshold(proto->ItemId, auctionItem->GetItemRandomPropertyId(),
                                                                   sPlayerbotAIConfig.buyUpgradeThreshold);
@@ -828,7 +1004,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
                       static_cast<uint32>(usage), static_cast<uint32>(proto->Quality),
                       static_cast<uint32>(auction->bid ? auction->bid : auction->startbid), auction->buyout);
 
-        if (!IsUpgradeUsage(usage))
+        if (!IsUpgradeUsage(usage) && !isMaterialIntent)
             continue;
 
         uint64 referencePrice = GetReferenceBuyerPrice(auctioneer, auctionItem);
@@ -870,13 +1046,14 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
         if (!offerPrice || offerPrice > MAX_MONEY_AMOUNT)
             continue;
 
-        candidates.push_back(AuctionBuyCandidate{
-            auction->Id,
-            proto->ItemId,
-            static_cast<uint32>(offerPrice),
-            useBuyout,
-            static_cast<uint8>(proto->Quality)
-        });
+        candidates.push_back(AuctionBuyCandidate{auction->Id,
+                                                 proto->ItemId,
+                                                 auction->itemCount,
+                                                 static_cast<uint32>(offerPrice),
+                                                 useBuyout,
+                                                 static_cast<uint8>(proto->Quality),
+                                                 isMaterialIntent,
+                                                 isMaterialIntent ? demandItr->second.maxSpend : 0});
     }
 
     if (candidates.empty())
@@ -888,6 +1065,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     });
 
     uint32 boughtCount = 0;
+    uint32 boughtMaterialCount = 0;
     std::unordered_set<uint32> purchasedItemEntries;
     for (AuctionBuyCandidate const& candidate : candidates)
     {
@@ -904,7 +1082,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
             continue;
 
         uint32 spendCapPercent = GetBuyerSpendCapPercent(candidate.quality);
-        if (!spendCapPercent)
+        if (!spendCapPercent && !candidate.isMaterialIntent)
             continue;
 
         uint64 money = bot->GetMoney();
@@ -930,10 +1108,19 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
 
             if (!CanSpendByFactionDailyCap(bot, candidate.offerPrice))
                 continue;
+
+            if (candidate.isMaterialIntent && candidate.intentMaxSpend > 0 &&
+                candidate.offerPrice > candidate.intentMaxSpend)
+                continue;
         }
 
-        uint64 rarityCap = money * spendCapPercent / 100;
-        if (!rarityCap || candidate.offerPrice > rarityCap || candidate.offerPrice > money)
+        if (!candidate.isMaterialIntent)
+        {
+            uint64 rarityCap = money * spendCapPercent / 100;
+            if (!rarityCap || candidate.offerPrice > rarityCap || candidate.offerPrice > money)
+                continue;
+        }
+        else if (candidate.offerPrice > money)
             continue;
 
         uint32 offerPrice = candidate.offerPrice;
@@ -969,6 +1156,26 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
         if (bot->GetMoney() >= moneyBefore)
             continue;
 
+        if (candidate.isMaterialIntent)
+        {
+            auto demandItr = materialDemand.find(candidate.itemEntry);
+            if (demandItr != materialDemand.end())
+            {
+                uint32 boughtStack = std::max<uint32>(1, candidate.stackCount);
+                if (demandItr->second.remainingDeficit > boughtStack)
+                    demandItr->second.remainingDeficit -= boughtStack;
+                else
+                    demandItr->second.remainingDeficit = 0;
+
+                if (demandItr->second.maxSpend > offerPrice)
+                    demandItr->second.maxSpend -= offerPrice;
+                else
+                    demandItr->second.maxSpend = 0;
+            }
+
+            ++boughtMaterialCount;
+        }
+
         if (IsAuctionActivityLoggingEnabled())
             LOG_DEBUG("playerbots.auction", "[BUY][{}] bot={} auctionId={} spent={}",
                       candidate.buyout ? "BOUGHT_OUT" : "BID_ACCEPTED", bot->GetName(), candidate.auctionId,
@@ -987,11 +1194,20 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     }
 
     if (!boughtCount)
+    {
+        if (!materialDemand.empty() && ScheduleMaterialGatherFallback(bot, botAI))
+            return true;
+
         return false;
+    }
+
+    if (!materialDemand.empty())
+        ReconcileMaterialIntentsFromDemand(botAI, materialDemand);
 
     if (IsAuctionActivityLoggingEnabled())
-        LOG_INFO("playerbots", "Bot {} placed {} auction upgrade purchase(s) at auctioneer {}",
-                 bot->GetName(), boughtCount, auctioneer->GetEntry());
+        LOG_INFO("playerbots",
+                 "Bot {} placed {} auction purchase(s) at auctioneer {} (material intents: {})",
+                 bot->GetName(), boughtCount, auctioneer->GetEntry(), boughtMaterialCount);
 
     return true;
 }

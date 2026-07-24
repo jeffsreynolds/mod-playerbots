@@ -31,8 +31,92 @@
 #include "RandomPlayerbotMgr.h"
 #include "ScriptMgr.h"
 #include "PlayerbotCommandScript.h"
+#include "TradeskillMaterialIntents.h"
+#include "TradeskillWorkPlan.h"
 #include "cmath"
+#include "ctime"
 #include "BattleGroundTactics.h"
+
+namespace
+{
+    struct TradeskillMonitorSnapshot
+    {
+        time_t sampledAt = 0;
+        uint32 randomBots = 0;
+        uint32 pendingTrainerPlans = 0;
+        uint32 botsWithMaterialIntents = 0;
+        uint32 totalMaterialIntents = 0;
+        uint32 activeDeficitIntents = 0;
+        uint64 totalDeficitItems = 0;
+        uint32 fallbackDueIntents = 0;
+        uint32 fallbackCooldownIntents = 0;
+        uint64 fallbackAttempts = 0;
+    };
+
+    TradeskillMonitorSnapshot CollectTradeskillMonitorSnapshot()
+    {
+        TradeskillMonitorSnapshot snapshot;
+        snapshot.sampledAt = time(nullptr);
+
+        for (PlayerBotMap::const_iterator itr = sRandomPlayerbotMgr.GetPlayerBotsBegin();
+             itr != sRandomPlayerbotMgr.GetPlayerBotsEnd(); ++itr)
+        {
+            Player* bot = itr->second;
+            if (!bot)
+                continue;
+
+            PlayerbotAI* botAI = PlayerbotsMgr::instance().GetPlayerbotAI(bot);
+            if (!botAI)
+                continue;
+
+            ++snapshot.randomBots;
+
+            TradeskillBot::TradeskillWorkPlan const& plan = TradeskillBot::GetWorkPlan(botAI);
+            if (plan.pendingTrainerLearn)
+                ++snapshot.pendingTrainerPlans;
+
+            TradeskillBot::TradeskillMaterialIntentList const& intents = TradeskillBot::GetMaterialIntents(botAI);
+            if (intents.empty())
+                continue;
+
+            ++snapshot.botsWithMaterialIntents;
+            snapshot.totalMaterialIntents += static_cast<uint32>(intents.size());
+
+            for (TradeskillBot::TradeskillMaterialIntent const& intent : intents)
+            {
+                if (!intent.deficitCount)
+                    continue;
+
+                ++snapshot.activeDeficitIntents;
+                snapshot.totalDeficitItems += intent.deficitCount;
+                snapshot.fallbackAttempts += intent.fallbackAttempts;
+
+                if (intent.nextFallbackAt > snapshot.sampledAt)
+                    ++snapshot.fallbackCooldownIntents;
+                else
+                    ++snapshot.fallbackDueIntents;
+            }
+        }
+
+        return snapshot;
+    }
+
+    void LogTradeskillMonitorSnapshot(TradeskillMonitorSnapshot const& snapshot)
+    {
+        LOG_INFO("playerbots",
+                 "[TRADESKILL][MONITOR] bots={} pending_plans={} bots_with_intents={} intents={} deficit_intents={} "
+                 "total_deficit={} fallback_due={} fallback_cooldown={} fallback_attempts={}",
+                 snapshot.randomBots,
+                 snapshot.pendingTrainerPlans,
+                 snapshot.botsWithMaterialIntents,
+                 snapshot.totalMaterialIntents,
+                 snapshot.activeDeficitIntents,
+                 snapshot.totalDeficitItems,
+                 snapshot.fallbackDueIntents,
+                 snapshot.fallbackCooldownIntents,
+                 snapshot.fallbackAttempts);
+    }
+}  // namespace
 
 class PlayerbotsDatabaseScript : public DatabaseScript
 {
@@ -380,7 +464,24 @@ public:
     {
         PlayerbotWorldThreadProcessor::instance().Update(diff);
         sRandomPlayerbotMgr.UpdateAI(diff);  // World thread only
+
+        if (!sPlayerbotAIConfig.tradeskillEnabled)
+            return;
+
+        uint32 interval = sPlayerbotAIConfig.tradeskillMonitorInterval;
+        if (!interval)
+            return;
+
+        time_t now = time(nullptr);
+        if (nextTradeskillMonitorAt != 0 && now < nextTradeskillMonitorAt)
+            return;
+
+        nextTradeskillMonitorAt = now + static_cast<time_t>(interval);
+        LogTradeskillMonitorSnapshot(CollectTradeskillMonitorSnapshot());
     }
+
+private:
+    time_t nextTradeskillMonitorAt = 0;
 };
 
 class PlayerbotsScript : public PlayerbotScript

@@ -111,6 +111,8 @@ bool PlayerbotAIConfig::Initialize()
         sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMaxActiveListingsPerCategory", 12);
     tradeskillAuctionMarketFitMaxCompetingListings =
         sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillAuctionMarketFitMaxCompetingListings", 30);
+    tradeskillMonitorInterval =
+        sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillMonitorInterval", 5 * MINUTE);
     tradeskillUnsoldAuctionCyclesWhite =
         std::max<uint32>(1, sConfigMgr->GetOption<uint32>("AiPlayerbot.TradeskillUnsoldAuctionCyclesWhite", 1));
     tradeskillUnsoldAuctionCyclesGreen =

@@ -358,6 +358,11 @@ AiPlayerbot.TradeskillAuctionMaxActiveListingsPerItem = 3
 AiPlayerbot.TradeskillAuctionMaxActiveListingsPerCategory = 12
 AiPlayerbot.TradeskillAuctionMarketFitMaxCompetingListings = 30
 
+# Server-level tradeskill monitor log interval in seconds.
+# Set to 0 to disable monitor output.
+# Default: 300 (5 minutes)
+AiPlayerbot.TradeskillMonitorInterval = 300
+
 # Unsold auction cycle caps by quality (default all 1).
 AiPlayerbot.TradeskillUnsoldAuctionCyclesWhite = 1
 AiPlayerbot.TradeskillUnsoldAuctionCyclesGreen = 1

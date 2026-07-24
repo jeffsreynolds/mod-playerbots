@@ -118,6 +118,7 @@ public:
     uint32 tradeskillAuctionMaxActiveListingsPerItem;
     uint32 tradeskillAuctionMaxActiveListingsPerCategory;
     uint32 tradeskillAuctionMarketFitMaxCompetingListings;
+    uint32 tradeskillMonitorInterval;
     uint32 tradeskillUnsoldAuctionCyclesWhite;
     uint32 tradeskillUnsoldAuctionCyclesGreen;
     uint32 tradeskillUnsoldAuctionCyclesBlue;

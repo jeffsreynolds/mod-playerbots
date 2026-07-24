@@ -94,6 +94,8 @@
 #include "TankTargetValue.h"
 #include "ThreatValues.h"
 #include "TradeValues.h"
+#include "TradeskillMaterialIntents.h"
+#include "TradeskillWorkPlan.h"
 #include "Value.h"
 #include "WaitForAttackTimeValue.h"
 
@@ -286,6 +288,8 @@ public:
         creators["should sell"] = &ValueContext::should_sell;
         creators["can sell"] = &ValueContext::can_sell;
         creators["auction intents"] = &ValueContext::auction_intents;
+        creators["tradeskill material intents"] = &ValueContext::tradeskill_material_intents;
+        creators["tradeskill work plan"] = &ValueContext::tradeskill_work_plan;
         creators["should visit auction house"] = &ValueContext::should_visit_auction_house;
         creators["can train"] = &ValueContext::can_train;
         creators["can fight equal"] = &ValueContext::can_fight_equal;
@@ -544,6 +548,14 @@ private:
     static UntypedValue* should_sell(PlayerbotAI* botAI) { return new ShouldSellValue(botAI); }
     static UntypedValue* can_sell(PlayerbotAI* botAI) { return new CanSellValue(botAI); }
     static UntypedValue* auction_intents(PlayerbotAI* botAI) { return new AuctionBot::AuctionIntentsValue(botAI); }
+    static UntypedValue* tradeskill_material_intents(PlayerbotAI* botAI)
+    {
+        return new TradeskillBot::TradeskillMaterialIntentsValue(botAI);
+    }
+    static UntypedValue* tradeskill_work_plan(PlayerbotAI* botAI)
+    {
+        return new TradeskillBot::TradeskillWorkPlanValue(botAI);
+    }
     static UntypedValue* should_visit_auction_house(PlayerbotAI* botAI)
     {
         return new ShouldVisitAuctionHouseValue(botAI);

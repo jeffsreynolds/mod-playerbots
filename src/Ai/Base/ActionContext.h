@@ -61,6 +61,7 @@
 #include "SayAction.h"
 #include "StayActions.h"
 #include "SuggestWhatToDoAction.h"
+#include "TradeskillPlannerAction.h"
 #include "TravelAction.h"
 #include "VehicleActions.h"
 #include "WorldBuffAction.h"
@@ -162,6 +163,7 @@ public:
         creators["reveal gathering item"] = &ActionContext::reveal_gathering_item;
         creators["outfit"] = &ActionContext::outfit;
         creators["random bot update"] = &ActionContext::random_bot_update;
+        creators["tradeskill planner"] = &ActionContext::tradeskill_planner;
         creators["delay"] = &ActionContext::delay;
         creators["greet"] = &ActionContext::greet;
         creators["check values"] = &ActionContext::check_values;
@@ -380,6 +382,7 @@ private:
     static Action* reveal_gathering_item(PlayerbotAI* botAI) { return new RevealGatheringItemAction(botAI); }
     static Action* outfit(PlayerbotAI* botAI) { return new OutfitAction(botAI); }
     static Action* random_bot_update(PlayerbotAI* botAI) { return new RandomBotUpdateAction(botAI); }
+    static Action* tradeskill_planner(PlayerbotAI* botAI) { return new TradeskillPlannerAction(botAI); }
     static Action* delay(PlayerbotAI* botAI) { return new DelayAction(botAI); }
 
     static Action* apply_poison(PlayerbotAI* botAI) { return new ImbueWithPoisonAction(botAI); }

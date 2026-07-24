@@ -36,6 +36,15 @@ void RpgStrategy::InitTriggers(std::vector<TriggerNode*>& triggers)
 {
     triggers.push_back(
         new TriggerNode(
+            "random bot update",
+            {
+                NextAction("tradeskill planner", 0.25f)
+            }
+        )
+    );
+
+    triggers.push_back(
+        new TriggerNode(
             "no rpg target",
             {
                 NextAction("choose rpg target", 5.0f)
