@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <limits>
 #include <optional>
+#include <unordered_set>
 
 #include "AuctionHouseMgr.h"
 #include "AuctionIntents.h"
@@ -489,6 +490,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     struct AuctionBuyCandidate
     {
         uint32 auctionId = 0;
+        uint32 itemEntry = 0;
         uint32 offerPrice = 0;
         bool buyout = false;
         uint8 quality = ITEM_QUALITY_POOR;
@@ -578,6 +580,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
 
         candidates.push_back(AuctionBuyCandidate{
             auction->Id,
+            proto->ItemId,
             static_cast<uint32>(offerPrice),
             useBuyout,
             static_cast<uint8>(proto->Quality)
@@ -593,10 +596,16 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
     });
 
     uint32 boughtCount = 0;
+    std::unordered_set<uint32> purchasedItemEntries;
     for (AuctionBuyCandidate const& candidate : candidates)
     {
         if (boughtCount >= buyLimit)
             break;
+
+        // Treat a successful purchase as the new baseline for this specific item
+        // and avoid buying duplicates of the same entry in one visit.
+        if (purchasedItemEntries.find(candidate.itemEntry) != purchasedItemEntries.end())
+            continue;
 
         AuctionEntry* liveAuction = auctionHouse->GetAuction(candidate.auctionId);
         if (!liveAuction)
@@ -649,6 +658,7 @@ bool AuctionBuyUpgradesAction::Execute(Event /*event*/)
                       candidate.buyout ? "BOUGHT_OUT" : "BID_ACCEPTED", bot->GetName(), candidate.auctionId,
                       offerPrice);
 
+        purchasedItemEntries.insert(candidate.itemEntry);
         ++boughtCount;
     }
 
